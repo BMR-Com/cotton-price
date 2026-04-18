@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🌾 Cotton Futures Analyzer</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & THEME ─────────────────────────────────────────────────────── */
+:root {
+  --bg0:#06080a; --bg1:#0b0f13; --bg2:#101820; --bg3:#16212c;
+  --border:#1b2a38; --accent:#c8a96e; --blue:#4a9eff;
+  --txt:#ccc4b4; --txt2:#6a8294; --txt3:#394f60;
+  --red:#c62828; --lred:#ef5350; --orng:#ef6c00;
+  --yel:#f9a825;  --lgrn:#7cb342; --grn:#2e7d32;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg0);color:var(--txt);font-family:'IBM Plex Mono',monospace;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+/* ── HEADER ────────────────────────────────────────────────────────────── */
+header{
+  background:var(--bg1);border-bottom:2px solid var(--border);
+  padding:16px 30px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{font-size:26px}
+.logo-title{font-size:15px;font-weight:700;letter-spacing:3px;color:var(--accent)}
+.logo-sub{font-size:9px;letter-spacing:2px;color:var(--txt3);margin-top:3px}
+#meta{font-size:9px;color:var(--txt3);text-align:right;line-height:2;letter-spacing:.5px}
+#meta b{color:var(--blue)}
+
+/* ── UPLOAD SCREEN ─────────────────────────────────────────────────────── */
+#upload-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - 65px);padding:40px;
+}
+.upload-box{
+  border:2px dashed var(--border);border-radius:8px;padding:60px 80px;
+  text-align:center;background:var(--bg1);cursor:pointer;transition:all .2s;
+  max-width:560px;width:100%;
+}
+.upload-box:hover,.upload-box.drag{border-color:var(--accent);background:var(--bg2)}
+.upload-icon{font-size:48px;margin-bottom:20px}
+.upload-title{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--accent);margin-bottom:10px}
+.upload-sub{font-size:10px;color:var(--txt3);line-height:2;margin-bottom:24px}
+.upload-btn{
+  display:inline-block;background:transparent;border:1px solid var(--accent);
+  color:var(--accent);padding:10px 28px;border-radius:3px;font-size:11px;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;
+  font-family:'IBM Plex Mono',monospace;
+}
+.upload-btn:hover{background:var(--accent);color:var(--bg0)}
+#file-input{display:none}
+.format-note{margin-top:30px;font-size:9px;color:var(--txt3);
+  background:var(--bg2);border:1px solid var(--border);border-radius:4px;
+  padding:14px 20px;text-align:left;line-height:2.2;max-width:560px;width:100%}
+.format-note b{color:var(--txt2)}
+
+/* ── MAIN DASHBOARD (hidden until file loaded) ─────────────────────────── */
+#dashboard{display:none}
+
+/* ── TABS ──────────────────────────────────────────────────────────────── */
+.tabs{
+  display:flex;background:var(--bg1);border-bottom:1px solid var(--border);
+  padding:0 28px;align-items:center;justify-content:space-between;
+}
+.tabs-left{display:flex}
+.tab{
+  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  padding:13px 20px;cursor:pointer;color:var(--txt3);
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.tab:hover{color:var(--txt2)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.reload-btn{
+  font-size:9px;letter-spacing:1px;color:var(--txt3);cursor:pointer;
+  border:1px solid var(--border);border-radius:3px;padding:5px 10px;
+  text-transform:uppercase;transition:all .15s;margin-right:4px;
+}
+.reload-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+/* ── PANELS ────────────────────────────────────────────────────────────── */
+.panel{display:none;padding:22px 28px}
+.panel.active{display:block}
+
+/* ── CONTROLS BAR ──────────────────────────────────────────────────────── */
+.controls{
+  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:4px;padding:14px 18px;margin-bottom:18px;
+}
+.ctrl{display:flex;flex-direction:column;gap:5px}
+.ctrl-lbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--txt3)}
+select{
+  background:var(--bg3);border:1px solid var(--border);color:var(--txt);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;
+  padding:7px 10px;border-radius:3px;cursor:pointer;outline:none;
+}
+select:focus{border-color:var(--accent)}
+.rrow{display:flex;gap:8px;align-items:center}
+input[type=range]{width:120px;accent-color:var(--accent);cursor:pointer}
+.rv{font-size:10px;color:var(--accent);min-width:34px;text-align:center}
+.btn{
+  background:transparent;border:1px solid var(--accent);color:var(--accent);
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;
+  padding:7px 13px;border-radius:3px;cursor:pointer;
+  transition:all .15s;text-transform:uppercase;
+}
+.btn:hover{background:var(--accent);color:var(--bg0)}
+
+/* ── CHART ──────────────────────────────────────────────────────────────── */
+.chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:4px}
+#chart-abs,#chart-pct{width:100%;height:570px}
+
+/* ── PERCENTILE TABLE ───────────────────────────────────────────────────── */
+.legend-row{
+  display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;
+  font-size:9px;align-items:center;color:var(--txt3);
+}
+.leg{display:flex;align-items:center;gap:4px}
+.leg-sq{width:9px;height:9px;border-radius:1px;flex-shrink:0}
+.tbl-wrap{overflow-x:auto;border-radius:4px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:10px}
+thead tr:first-child th{
+  background:var(--bg2);color:var(--accent);font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--border);
+  text-align:center;white-space:nowrap;
+}
+thead tr:last-child th{
+  background:var(--bg1);color:var(--txt3);font-size:8px;padding:6px 12px;
+  border-bottom:2px solid var(--border);text-align:center;font-weight:400;
+}
+td{padding:5px 10px;border-bottom:1px solid #0c1318;vertical-align:middle}
+tr:hover td{background:rgba(200,169,110,.04)}
+.td-c{
+  font-weight:700;color:var(--accent);font-size:11px;white-space:nowrap;
+  background:var(--bg2)!important;border-right:1px solid var(--border);
+  text-align:center;vertical-align:middle;
+}
+.td-f{
+  color:var(--txt2);font-size:9px;white-space:nowrap;
+  background:var(--bg2)!important;border-right:1px solid var(--border);
+  text-align:right;padding-right:12px;
+}
+.bc{min-width:155px;padding:4px 8px}
+.bh{display:flex;justify-content:space-between;margin-bottom:2px;font-size:8px;color:var(--txt3)}
+.bpct{font-size:10px;font-weight:700}
+.bt{position:relative;height:8px;background:#080c10;border-radius:2px;
+  border:1px solid #14202c;overflow:visible;margin:2px 0}
+.bf{position:absolute;left:0;top:0;height:100%;border-radius:2px 0 0 2px}
+.bk{position:absolute;top:-3px;width:2px;height:14px;background:#fff;
+  opacity:.85;transform:translateX(-1px)}
+.bv{font-size:9px;font-weight:700;text-align:center;margin-top:2px}
+.bn{font-size:8px;color:var(--txt3);text-align:right}
+.na{color:var(--txt3);font-size:9px;text-align:center;padding:6px 0}
+.note{font-size:8px;color:var(--txt3);margin-top:10px;letter-spacing:.3px}
+tr.first-row td{border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌾</div>
+    <div>
+      <div class="logo-title">COTTON FUTURES ANALYZER</div>
+      <div class="logo-sub">Bloomberg Historical Data · 2000–Present</div>
+    </div>
+  </div>
+  <div id="meta">Upload a CSV to begin</div>
+</header>
+
+<!-- ── UPLOAD SCREEN ─────────────────────────────────────────────────────── -->
+<div id="upload-screen">
+  <div class="upload-box" id="drop-zone"
+       onclick="document.getElementById('file-input').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleDrop(event)">
+    <div class="upload-icon">📂</div>
+    <div class="upload-title">Upload Bloomberg CSV</div>
+    <div class="upload-sub">
+      Drop your file here, or click to browse<br>
+      Supports Bloomberg wide-format export (cotton_raw.csv)
+    </div>
+    <label class="upload-btn">Choose File</label>
+    <input type="file" id="file-input" accept=".csv" onchange="handleFile(this.files[0])">
+  </div>
+
+  <div class="format-note">
+    <b>Expected format:</b> Bloomberg wide-format CSV<br>
+    <b>First column:</b> Dates (1/3/00 or 01/03/2000)<br>
+    <b>Column headers:</b> CTMAR1 Comdty PX_LAST, CTMAR1 Comdty OPEN_INT, …<br>
+    <b>Missing values:</b> #N/A N/A → excluded from all calculations<br>
+    <b>Contracts:</b> CTMAR1 CTMAR2 CTMAY1 CTMAY2 CTJUL1 CTJUL2 CTDEC1 CTDEC2<br>
+    <b>Fields:</b> PX_LAST · OPEN_INT · HIST_CALL_IMP_VOL
+  </div>
+</div>
+
+<!-- ── DASHBOARD ─────────────────────────────────────────────────────────── -->
+<div id="dashboard">
+
+  <div class="tabs">
+    <div class="tabs-left">
+      <div class="tab active" onclick="showTab('abs',this)">📈 &nbsp;Seasonality — Daily Values</div>
+      <div class="tab"        onclick="showTab('pct',this)">📊 &nbsp;Seasonality — % from Jan 1</div>
+      <div class="tab"        onclick="showTab('tbl',this)">🎯 &nbsp;Percentile Dashboard</div>
+    </div>
+    <div class="reload-btn" onclick="resetApp()">⟳ Load New File</div>
+  </div>
+
+  <!-- Panel: Absolute Seasonality -->
+  <div id="panel-abs" class="panel active">
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-lbl">Contract</div>
+        <select id="a-ct" onchange="drawAbs()"></select>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Field</div>
+        <select id="a-fd" onchange="drawAbs()"></select>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Year From</div>
+        <div class="rrow">
+          <input type="range" id="a-y1" oninput="document.getElementById('a-v1').textContent=this.value;drawAbs()">
+          <span class="rv" id="a-v1">2000</span>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Year To</div>
+        <div class="rrow">
+          <input type="range" id="a-y2" oninput="document.getElementById('a-v2').textContent=this.value;drawAbs()">
+          <span class="rv" id="a-v2">2025</span>
+        </div>
+      </div>
+      <button class="btn" onclick="setYears('a', META.y0, META.y1)">All Years</button>
+      <button class="btn" onclick="setYears('a', META.y1, META.y1)">Latest Only</button>
+      <button class="btn" onclick="setYears('a', META.y1-4, META.y1)">Last 5 Yrs</button>
+    </div>
+    <div class="chart-wrap"><div id="chart-abs"></div></div>
+  </div>
+
+  <!-- Panel: % Change Seasonality -->
+  <div id="panel-pct" class="panel">
+    <div class="controls">
+      <div class="ctrl">
+        <div class="ctrl-lbl">Contract</div>
+        <select id="p-ct" onchange="drawPct()"></select>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Field</div>
+        <select id="p-fd" onchange="drawPct()"></select>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Year From</div>
+        <div class="rrow">
+          <input type="range" id="p-y1" oninput="document.getElementById('p-v1').textContent=this.value;drawPct()">
+          <span class="rv" id="p-v1">2000</span>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Year To</div>
+        <div class="rrow">
+          <input type="range" id="p-y2" oninput="document.getElementById('p-v2').textContent=this.value;drawPct()">
+          <span class="rv" id="p-v2">2025</span>
+        </div>
+      </div>
+      <button class="btn" onclick="setYears('p', META.y0, META.y1)">All Years</button>
+      <button class="btn" onclick="setYears('p', META.y1, META.y1)">Latest Only</button>
+      <button class="btn" onclick="setYears('p', META.y1-4, META.y1)">Last 5 Yrs</button>
+    </div>
+    <div class="chart-wrap"><div id="chart-pct"></div></div>
+  </div>
+
+  <!-- Panel: Percentile Dashboard -->
+  <div id="panel-tbl" class="panel">
+    <div class="legend-row">
+      <span>Percentile key:</span>
+      <div class="leg"><div class="leg-sq" style="background:#c62828"></div><span style="color:#c62828">0–10</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#ef5350"></div><span style="color:#ef5350">10–25</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#ef6c00"></div><span style="color:#ef6c00">25–40</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#f9a825"></div><span style="color:#f9a825">40–60</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#7cb342"></div><span style="color:#7cb342">60–75</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#66bb6a"></div><span style="color:#66bb6a">75–90</span></div>
+      <div class="leg"><div class="leg-sq" style="background:#2e7d32"></div><span style="color:#2e7d32">90–100</span></div>
+    </div>
+    <div class="tbl-wrap" id="tbl-container"></div>
+    <div class="note" id="tbl-note"></div>
+  </div>
+</div>
+
+<!-- ── JAVASCRIPT ─────────────────────────────────────────────────────────── -->
+<script>
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const CONTRACTS  = ['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
+const FIELDS     = ['PX_LAST','OPEN_INT','HIST_CALL_IMP_VOL'];
+const FIELD_NICE = {PX_LAST:'Price (¢/lb)', OPEN_INT:'Open Interest', HIST_CALL_IMP_VOL:'Impl. Vol (%)'};
+const YEAR_COLORS = [
+  '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45',
+  '#fabed4','#469990','#dcbeff','#9A6324','#fffac8','#800000','#aaffc3','#808000',
+  '#ffd8b1','#000075','#a9a9a9','#e0e0e0','#e6beff','#ffe119','#00BFFF','#FF69B4',
+  '#7FFF00','#FF4500',
+];
+
+// Global data store
+let SEA = {};    // absolute seasonality: {contract: {field: {year: {doy[], val[]}}}}
+let PCT = {};    // % from Jan:            same shape
+let ROWS = [];   // percentile table rows
+let META = {};
+
+// ── FILE HANDLING ─────────────────────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  Papa.parse(file, {
+    header: false,
+    skipEmptyLines: true,
+    complete: results => processData(results.data),
+    error: err => alert('Error reading file: ' + err.message),
+  });
+}
+
+// ── PARSE BLOOMBERG CSV ───────────────────────────────────────────────────────
+function processData(raw) {
+  if (raw.length < 2) { alert('File appears empty.'); return; }
+
+  const headers = raw[0];   // row 0 = column names
+  const dataRows = raw.slice(1);
+
+  // Map column index → {contract, field}
+  const colMap = {};
+  for (let i = 1; i < headers.length; i++) {
+    const parts = headers[i].trim().split(/\s+/);
+    if (parts.length >= 3) {
+      const contract = parts[0];
+      const field    = parts[parts.length - 1];
+      if (CONTRACTS.includes(contract) && FIELDS.includes(field)) {
+        colMap[i] = { contract, field };
+      }
+    }
+  }
+
+  // Build long records: [{date, contract, field, value}]
+  const records = [];
+  for (const row of dataRows) {
+    const rawDate = row[0] ? row[0].trim() : '';
+    if (!rawDate) continue;
+    const date = parseDate(rawDate);
+    if (!date) continue;
+
+    for (const [idx, cf] of Object.entries(colMap)) {
+      const raw = row[idx] ? row[idx].trim() : '';
+      if (!raw || raw === '#N/A N/A' || raw === '#N/A' || raw === 'N/A' || raw === '') continue;
+      const val = parseFloat(raw);
+      if (isNaN(val)) continue;
+      records.push({ date, contract: cf.contract, field: cf.field, value: val });
+    }
+  }
+
+  if (records.length === 0) { alert('No valid data found in file. Check format.'); return; }
+
+  // Sort by date
+  records.sort((a, b) => a.date - b.date);
+
+  const dates = records.map(r => r.date);
+  const yMin = new Date(Math.min(...dates)).getFullYear();
+  const yMax = new Date(Math.max(...dates)).getFullYear();
+  const latestDate = new Date(Math.max(...dates));
+
+  META = {
+    y0: yMin, y1: yMax,
+    latest: formatDate(latestDate),
+    n: records.length,
+    days: new Set(records.map(r => r.date.toString())).size,
+  };
+
+  // Build seasonality structures
+  buildSeasonality(records);
+  buildPctChange(records);
+  buildPercentileRows(records);
+
+  // Show dashboard
+  initDashboard();
+}
+
+function parseDate(s) {
+  // Handles M/D/YY, M/D/YYYY, MM/DD/YYYY
+  const parts = s.split('/');
+  if (parts.length !== 3) return null;
+  let [m, d, y] = parts.map(Number);
+  if (y < 100) y += y < 50 ? 2000 : 1900;
+  const dt = new Date(y, m - 1, d);
+  return isNaN(dt) ? null : dt;
+}
+
+function formatDate(d) {
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+// Group records → {contract: {field: {year: sorted [{doy, val}]}}}
+function groupBy(records) {
+  const out = {};
+  for (const c of CONTRACTS) { out[c] = {}; for (const f of FIELDS) out[c][f] = {}; }
+  for (const r of records) {
+    if (!out[r.contract] || !out[r.contract][r.field]) continue;
+    const yr  = r.date.getFullYear().toString();
+    const doy = getDOY(r.date);
+    if (!out[r.contract][r.field][yr]) out[r.contract][r.field][yr] = [];
+    out[r.contract][r.field][yr].push({ doy, val: r.value });
+  }
+  // Sort each year by doy, deduplicate (keep last)
+  for (const c of CONTRACTS) for (const f of FIELDS) {
+    const yrObj = out[c][f];
+    for (const yr in yrObj) {
+      const pts = yrObj[yr];
+      pts.sort((a, b) => a.doy - b.doy);
+      const seen = {};
+      yrObj[yr] = pts.filter(p => { const k=p.doy; const ok=!seen[k]; seen[k]=true; return ok; });
+    }
+  }
+  return out;
+}
+
+function getDOY(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  return Math.floor((date - start) / 86400000);
+}
+
+function buildSeasonality(records) {
+  const grp = groupBy(records);
+  SEA = {};
+  for (const c of CONTRACTS) {
+    SEA[c] = {};
+    for (const f of FIELDS) {
+      SEA[c][f] = {};
+      for (const yr in grp[c][f]) {
+        const pts = grp[c][f][yr];
+        SEA[c][f][yr] = { doy: pts.map(p=>p.doy), val: pts.map(p=>p.val) };
+      }
+    }
+  }
+}
+
+function buildPctChange(records) {
+  const grp = groupBy(records);
+  PCT = {};
+  for (const c of CONTRACTS) {
+    PCT[c] = {};
+    for (const f of FIELDS) {
+      PCT[c][f] = {};
+      for (const yr in grp[c][f]) {
+        const pts = grp[c][f][yr];
+        const base = pts[0].val;
+        if (!base || base === 0) continue;
+        PCT[c][f][yr] = {
+          doy: pts.map(p => p.doy),
+          val: pts.map(p => +((p.val / base - 1) * 100).toFixed(3)),
+        };
+      }
+    }
+  }
+}
+
+// ── PERCENTILE CALCULATIONS ───────────────────────────────────────────────────
+function buildPercentileRows(records) {
+  // Build flat series per contract+field
+  const series = {};
+  for (const c of CONTRACTS) {
+    series[c] = {};
+    for (const f of FIELDS) {
+      const pts = records.filter(r => r.contract === c && r.field === f);
+      pts.sort((a, b) => a.date - b.date);
+      // deduplicate by date (keep last)
+      const seen = {}; const deduped = [];
+      for (const p of pts) {
+        const k = p.date.toISOString().slice(0, 10);
+        seen[k] = p.value;
+      }
+      series[c][f] = Object.values(seen).map(Number);
+    }
+  }
+
+  // Build rows
+  ROWS = [];
+  for (const c of CONTRACTS) {
+    for (const f of FIELDS) {
+      const allVals = series[c][f];
+      const row = { contract: c, field: f, field_nice: FIELD_NICE[f], current: null, date: '—' };
+      for (const lb of [5, 10, 25]) {
+        row['pct'+lb] = row['min'+lb] = row['max'+lb] = null;
+        row['n'+lb] = 0;
+      }
+      if (allVals.length === 0) { ROWS.push(row); continue; }
+
+      // Latest value (last in sorted series)
+      const cur = allVals[allVals.length - 1];
+      row.current = +cur.toFixed(2);
+
+      // Latest date for this contract+field
+      const pts = records.filter(r => r.contract === c && r.field === f);
+      pts.sort((a, b) => a.date - b.date);
+      row.date = formatDate(pts[pts.length - 1].date);
+      const latestDate = pts[pts.length - 1].date;
+
+      for (const lb of [5, 10, 25]) {
+        let cutoff = null;
+        if (lb < 25) {
+          cutoff = new Date(latestDate);
+          cutoff.setFullYear(cutoff.getFullYear() - lb);
+        }
+        const hist = cutoff
+          ? pts.filter(p => p.date > cutoff && p.date <= latestDate).map(p => p.value)
+          : pts.filter(p => p.date <= latestDate).map(p => p.value);
+
+        if (hist.length < 10) { row['n'+lb] = hist.length; continue; }
+        const below = hist.filter(v => v < cur).length;
+        row['pct'+lb] = +((below / hist.length) * 100).toFixed(1);
+        row['min'+lb] = +Math.min(...hist).toFixed(2);
+        row['max'+lb] = +Math.max(...hist).toFixed(2);
+        row['n'+lb]   = hist.length;
+      }
+      ROWS.push(row);
+    }
+  }
+}
+
+// ── DASHBOARD INIT ────────────────────────────────────────────────────────────
+function initDashboard() {
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display    = 'block';
+
+  // Populate header meta
+  document.getElementById('meta').innerHTML =
+    `Data range: <b>${META.y0} – ${META.y1}</b> &nbsp;|&nbsp; Latest: <b>${META.latest}</b><br>` +
+    `Trading days: <b>${META.days.toLocaleString()}</b> &nbsp;|&nbsp; Records: <b>${META.n.toLocaleString()}</b>`;
+
+  // Populate selects and sliders
+  ['a','p'].forEach(x => {
+    const cs = document.getElementById(x+'-ct');
+    const fs = document.getElementById(x+'-fd');
+    cs.innerHTML = ''; fs.innerHTML = '';
+    CONTRACTS.forEach(c => cs.innerHTML += `<option value="${c}">${c}</option>`);
+    FIELDS.forEach(f    => fs.innerHTML += `<option value="${f}">${FIELD_NICE[f]}</option>`);
+    ['y1','y2'].forEach(id => {
+      const el  = document.getElementById(x+'-'+id);
+      const val = id === 'y1' ? META.y0 : META.y1;
+      el.min = META.y0; el.max = META.y1; el.value = val;
+      document.getElementById(x+'-v'+id.slice(1)).textContent = val;
+    });
+  });
+
+  drawAbs();
+  buildTable();
+}
+
+// ── TAB SWITCHER ──────────────────────────────────────────────────────────────
+function showTab(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t   => t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  el.classList.add('active');
+  if (id==='abs') drawAbs();
+  if (id==='pct') drawPct();
+}
+
+function resetApp() {
+  document.getElementById('dashboard').style.display   = 'none';
+  document.getElementById('upload-screen').style.display = 'flex';
+  document.getElementById('file-input').value = '';
+  SEA={}; PCT={}; ROWS=[]; META={};
+}
+
+// ── CHART RENDERING ───────────────────────────────────────────────────────────
+function chartLayout(yLabel, title, zeroline) {
+  return {
+    title:{ text:title, font:{color:'#c8a96e',size:12,family:'IBM Plex Mono'}, x:0.01 },
+    xaxis:{
+      title:'Day of Year', color:'#394f60', gridcolor:'#0b0f13',
+      tickvals:[1,32,60,91,121,152,182,213,244,274,305,335],
+      ticktext:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      range:[1,366], showline:true, linecolor:'#1b2a38',
+    },
+    yaxis:{
+      title:yLabel, color:'#394f60', gridcolor:'#0b0f13',
+      zeroline, zerolinecolor:'#1c3040', zerolinewidth:1.5,
+      showline:true, linecolor:'#1b2a38',
+    },
+    plot_bgcolor:'#06080a', paper_bgcolor:'#0b0f13',
+    font:{color:'#6a8294',family:'IBM Plex Mono'},
+    legend:{
+      x:1.01,y:1,bgcolor:'rgba(0,0,0,0)',bordercolor:'#1b2a38',borderwidth:1,
+      font:{size:9}, title:{text:'Year',font:{color:'#c8a96e'}},
+    },
+    hovermode:'closest',
+    margin:{l:60,r:110,t:48,b:50},
+  };
+}
+
+function buildTraces(dataObj, contract, field, y1, y2) {
+  const years = Object.keys(dataObj[contract]?.[field] || {})
+    .filter(y => +y >= y1 && +y <= y2).sort();
+  const latest = years.at(-1);
+  return years.map((yr, i) => {
+    const d = dataObj[contract][field][yr];
+    const isLatest = yr === latest;
+    return {
+      x: d.doy, y: d.val, mode:'lines', name:yr,
+      line:{ color: YEAR_COLORS[i % YEAR_COLORS.length], width: isLatest ? 2.8 : 1.1 },
+      opacity: isLatest ? 1 : 0.6,
+      hovertemplate:`<b>${yr}</b><br>DoY %{x}<br>%{y:.2f}<extra></extra>`,
+    };
+  });
+}
+
+function drawAbs() {
+  const c  = document.getElementById('a-ct').value;
+  const f  = document.getElementById('a-fd').value;
+  const y1 = +document.getElementById('a-y1').value;
+  const y2 = +document.getElementById('a-y2').value;
+  Plotly.react('chart-abs', buildTraces(SEA,c,f,y1,y2),
+    chartLayout(FIELD_NICE[f], `${c}  ·  ${FIELD_NICE[f]}  —  Seasonality (Daily Values)`, false),
+    {responsive:true,displayModeBar:true,scrollZoom:true});
+}
+
+function drawPct() {
+  const c  = document.getElementById('p-ct').value;
+  const f  = document.getElementById('p-fd').value;
+  const y1 = +document.getElementById('p-y1').value;
+  const y2 = +document.getElementById('p-y2').value;
+  Plotly.react('chart-pct', buildTraces(PCT,c,f,y1,y2),
+    chartLayout('% Change from Jan 1',
+      `${c}  ·  ${FIELD_NICE[f]}  —  Seasonality (% from Year Start)`, true),
+    {responsive:true,displayModeBar:true,scrollZoom:true});
+}
+
+function setYears(x, y1, y2) {
+  y1 = Math.max(META.y0, y1); y2 = Math.min(META.y1, y2);
+  document.getElementById(x+'-y1').value = y1; document.getElementById(x+'-v1').textContent = y1;
+  document.getElementById(x+'-y2').value = y2; document.getElementById(x+'-v2').textContent = y2;
+  x==='a' ? drawAbs() : drawPct();
+}
+
+// ── PERCENTILE TABLE ──────────────────────────────────────────────────────────
+function pctColor(p) {
+  if (p===null) return '#394f60';
+  if (p < 10)   return '#c62828';
+  if (p < 25)   return '#ef5350';
+  if (p < 40)   return '#ef6c00';
+  if (p < 60)   return '#f9a825';
+  if (p < 75)   return '#7cb342';
+  if (p < 90)   return '#66bb6a';
+  return '#2e7d32';
+}
+
+function fmt(v) {
+  if (v===null||v===undefined) return '—';
+  return Math.abs(v)>=10000 ? v.toLocaleString('en',{maximumFractionDigits:0})
+       : Math.abs(v)>=100   ? v.toFixed(1) : v.toFixed(2);
+}
+
+function barCell(row, lb) {
+  const p=row['pct'+lb], cur=row.current, mn=row['min'+lb], mx=row['max'+lb], n=row['n'+lb];
+  if (p===null || cur===null)
+    return `<td class="bc"><div class="na">N/A</div></td>`;
+  const col=pctColor(p), pv=Math.max(0,Math.min(100,p));
+  return `<td class="bc">
+    <div class="bh">
+      <span>${fmt(mn)}</span>
+      <span class="bpct" style="color:${col}">${p.toFixed(0)}%ile</span>
+      <span>${fmt(mx)}</span>
+    </div>
+    <div class="bt">
+      <div class="bf" style="width:${pv.toFixed(1)}%;background:linear-gradient(90deg,#080e08,${col})"></div>
+      <div class="bk" style="left:${pv.toFixed(1)}%"></div>
+    </div>
+    <div class="bv" style="color:${col}">${fmt(cur)}</div>
+    <div class="bn">n=${n.toLocaleString()}</div>
+  </td>`;
+}
+
+function buildTable() {
+  let h = `<table><thead>
+    <tr>
+      <th rowspan="2">Contract</th>
+      <th rowspan="2">Field</th>
+      <th style="border-left:2px solid var(--border);color:var(--blue)">5-Year Percentile</th>
+      <th style="border-left:2px solid var(--border);color:var(--blue)">10-Year Percentile</th>
+      <th style="border-left:2px solid var(--border);color:var(--blue)">25-Year Percentile</th>
+    </tr>
+    <tr>
+      <th style="border-left:2px solid var(--border)">Current vs 5yr Range</th>
+      <th style="border-left:2px solid var(--border)">Current vs 10yr Range</th>
+      <th style="border-left:2px solid var(--border)">Current vs 25yr Range</th>
+    </tr>
+  </thead><tbody>`;
+
+  let last = null;
+  ROWS.forEach(r => {
+    const isFirst = r.contract !== last; last = r.contract;
+    const bg = CONTRACTS.indexOf(r.contract) % 2 === 0 ? '#0b0f13' : '#080c10';
+    h += `<tr class="${isFirst?'first-row':''}" style="background:${bg}">`;
+    if (isFirst) h += `<td class="td-c" rowspan="${FIELDS.length}">${r.contract}</td>`;
+    h += `<td class="td-f">${r.field_nice}</td>`;
+    h += barCell(r,5) + barCell(r,10) + barCell(r,25);
+    h += `</tr>`;
+  });
+  h += `</tbody></table>`;
+
+  document.getElementById('tbl-container').innerHTML = h;
+  document.getElementById('tbl-note').textContent =
+    `Values as of ${META.latest}  ·  #N/A N/A values excluded from all calculations — never interpolated`;
+}
+</script>
+</body>
+</html>
