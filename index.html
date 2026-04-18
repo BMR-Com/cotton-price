@@ -8,611 +8,494 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg0:#06080a; --bg1:#0b0f13; --bg2:#101820; --bg3:#16212c;
-  --border:#1b2a38; --accent:#c8a96e; --blue:#4a9eff;
-  --txt:#ccc4b4; --txt2:#6a8294; --txt3:#394f60;
-  --red:#c62828; --lred:#ef5350; --orng:#ef6c00;
-  --yel:#f9a825; --lgrn:#7cb342; --grn:#2e7d32;
-}
+:root{--bg0:#06080a;--bg1:#0b0f13;--bg2:#101820;--bg3:#16212c;--border:#1b2a38;--accent:#c8a96e;--blue:#4a9eff;--green:#5cb85c;--txt:#ccc4b4;--txt2:#6a8294;--txt3:#394f60}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg0);color:var(--txt);font-family:'IBM Plex Mono',monospace;min-height:100vh}
-
-/* HEADER */
-header{
-  background:var(--bg1);border-bottom:2px solid var(--border);
-  padding:16px 30px;display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:100;
-}
-.logo{display:flex;align-items:center;gap:12px}
-.logo-icon{font-size:26px}
-.logo-title{font-size:15px;font-weight:700;letter-spacing:3px;color:var(--accent)}
-.logo-sub{font-size:9px;letter-spacing:2px;color:var(--txt3);margin-top:3px}
-#meta{font-size:9px;color:var(--txt3);text-align:right;line-height:2;letter-spacing:.5px}
+header{background:var(--bg1);border-bottom:2px solid var(--border);padding:12px 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-title{font-size:14px;font-weight:700;letter-spacing:3px;color:var(--accent)}
+.logo-sub{font-size:8px;letter-spacing:2px;color:var(--txt3);margin-top:2px}
+#meta{font-size:9px;color:var(--txt3);text-align:right;line-height:2}
 #meta b{color:var(--blue)}
-
-/* LOADING / ERROR SCREEN */
-#loading-screen{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  min-height:calc(100vh - 65px);gap:20px;
-}
-.spinner{
-  width:40px;height:40px;border:3px solid var(--border);
-  border-top-color:var(--accent);border-radius:50%;
-  animation:spin 0.8s linear infinite;
-}
+#loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 52px);gap:14px}
+.spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.loading-txt{font-size:11px;color:var(--txt3);letter-spacing:2px}
-#error-box{
-  display:none;background:var(--bg2);border:1px solid #c62828;
-  border-radius:6px;padding:30px 40px;max-width:520px;text-align:center;
-}
-.error-icon{font-size:36px;margin-bottom:12px}
-.error-title{font-size:13px;font-weight:700;color:#ef5350;letter-spacing:2px;margin-bottom:10px}
-.error-msg{font-size:10px;color:var(--txt3);line-height:2}
-.error-msg code{color:var(--accent);background:var(--bg3);padding:2px 6px;border-radius:2px}
-
-/* DASHBOARD */
+.load-txt{font-size:10px;color:var(--txt3);letter-spacing:2px}
+#err-box{display:none;background:var(--bg2);border:1px solid #c62828;border-radius:5px;padding:22px 30px;max-width:460px;text-align:center}
+.err-title{font-size:11px;color:#ef5350;letter-spacing:2px;margin-bottom:8px}
+.err-msg{font-size:9px;color:var(--txt3);line-height:2.4}
+.err-msg code{color:var(--accent);background:var(--bg3);padding:1px 5px;border-radius:2px}
 #dashboard{display:none}
-
-/* TABS */
-.tabs{
-  display:flex;background:var(--bg1);border-bottom:1px solid var(--border);
-  padding:0 28px;align-items:center;justify-content:space-between;
-}
+.tabs{display:flex;background:var(--bg1);border-bottom:1px solid var(--border);padding:0 18px;align-items:center;justify-content:space-between}
 .tabs-left{display:flex}
-.tab{
-  font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
-  padding:13px 20px;cursor:pointer;color:var(--txt3);
-  border-bottom:2px solid transparent;transition:all .15s;
-}
+.tab{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;padding:11px 16px;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .15s}
 .tab:hover{color:var(--txt2)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.data-path{font-size:9px;color:var(--txt3);letter-spacing:.5px}
-.data-path b{color:var(--accent)}
-
-/* PANELS */
-.panel{display:none;padding:22px 28px}
+.data-src{font-size:8px;color:var(--txt3);letter-spacing:.5px}
+.data-src b{color:var(--txt2)}
+.year-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:9px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.yb-lbl{font-size:8px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase}
+.mbtn{font-size:8px;letter-spacing:1px;padding:3px 9px;border-radius:3px;cursor:pointer;border:1px solid var(--border);color:var(--txt3);background:transparent;font-family:'IBM Plex Mono',monospace;transition:all .15s;text-transform:uppercase}
+.mbtn.active{border-color:var(--accent);color:var(--accent)}
+.rrow{display:flex;align-items:center;gap:6px}
+input[type=range]{width:90px;accent-color:var(--accent);cursor:pointer}
+.rv{font-size:10px;color:var(--accent);min-width:30px}
+.qbtn{font-size:8px;padding:3px 8px;border:1px solid var(--border);border-radius:3px;color:var(--txt3);cursor:pointer;background:transparent;font-family:'IBM Plex Mono',monospace;transition:all .15s}
+.qbtn:hover{border-color:var(--accent);color:var(--accent)}
+#year-pick{display:none;flex-wrap:wrap;gap:3px;max-width:650px}
+.yc{font-size:8px;padding:2px 6px;border:1px solid var(--border);border-radius:2px;color:var(--txt3);cursor:pointer;transition:all .1s;user-select:none}
+.yc.on{border-color:var(--accent);color:var(--accent);background:rgba(200,169,110,.08)}
+.panel{display:none;padding:14px 18px}
 .panel.active{display:block}
-
-/* CONTROLS */
-.controls{
-  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;
-  background:var(--bg2);border:1px solid var(--border);
-  border-radius:4px;padding:14px 18px;margin-bottom:18px;
-}
-.ctrl{display:flex;flex-direction:column;gap:5px}
-.ctrl-lbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--txt3)}
-select{
-  background:var(--bg3);border:1px solid var(--border);color:var(--txt);
-  font-family:'IBM Plex Mono',monospace;font-size:11px;
-  padding:7px 10px;border-radius:3px;cursor:pointer;outline:none;
-}
-select:focus{border-color:var(--accent)}
-.rrow{display:flex;gap:8px;align-items:center}
-input[type=range]{width:120px;accent-color:var(--accent);cursor:pointer}
-.rv{font-size:10px;color:var(--accent);min-width:34px;text-align:center}
-.btn{
-  background:transparent;border:1px solid var(--accent);color:var(--accent);
-  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;
-  padding:7px 13px;border-radius:3px;cursor:pointer;
-  transition:all .15s;text-transform:uppercase;
-}
-.btn:hover{background:var(--accent);color:var(--bg0)}
-
-/* CHART */
-.chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:4px}
-#chart-abs,#chart-pct{width:100%;height:570px}
-
-/* PERCENTILE TABLE */
-.legend-row{
-  display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;
-  font-size:9px;align-items:center;color:var(--txt3);
-}
-.leg{display:flex;align-items:center;gap:4px}
-.leg-sq{width:9px;height:9px;border-radius:1px;flex-shrink:0}
-.tbl-wrap{overflow-x:auto;border-radius:4px;border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse;font-size:10px}
-thead tr:first-child th{
-  background:var(--bg2);color:var(--accent);font-size:9px;letter-spacing:1.5px;
-  text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--border);
-  text-align:center;white-space:nowrap;
-}
-thead tr:last-child th{
-  background:var(--bg1);color:var(--txt3);font-size:8px;padding:6px 12px;
-  border-bottom:2px solid var(--border);text-align:center;font-weight:400;
-}
-td{padding:5px 10px;border-bottom:1px solid #0c1318;vertical-align:middle}
-tr:hover td{background:rgba(200,169,110,.04)}
-.td-c{
-  font-weight:700;color:var(--accent);font-size:11px;white-space:nowrap;
-  background:var(--bg2)!important;border-right:1px solid var(--border);
-  text-align:center;vertical-align:middle;
-}
-.td-f{
-  color:var(--txt2);font-size:9px;white-space:nowrap;
-  background:var(--bg2)!important;border-right:1px solid var(--border);
-  text-align:right;padding-right:12px;
-}
-.bc{min-width:155px;padding:4px 8px}
-.bh{display:flex;justify-content:space-between;margin-bottom:2px;font-size:8px;color:var(--txt3)}
-.bpct{font-size:10px;font-weight:700}
-.bt{position:relative;height:8px;background:#080c10;border-radius:2px;
-  border:1px solid #14202c;overflow:visible;margin:2px 0}
-.bf{position:absolute;left:0;top:0;height:100%;border-radius:2px 0 0 2px}
-.bk{position:absolute;top:-3px;width:2px;height:14px;background:#fff;
-  opacity:.85;transform:translateX(-1px)}
-.bv{font-size:9px;font-weight:700;text-align:center;margin-top:2px}
-.bn{font-size:8px;color:var(--txt3);text-align:right}
-.na{color:var(--txt3);font-size:9px;text-align:center;padding:6px 0}
-.note{font-size:8px;color:var(--txt3);margin-top:10px;letter-spacing:.3px}
-tr.first-row td{border-top:1px solid var(--border)}
+.ct-row{margin-bottom:16px}
+.ct-lbl{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--accent);padding:5px 10px;background:var(--bg2);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;display:inline-block}
+.charts-row{display:flex;gap:6px;background:var(--bg1);border:1px solid var(--border);border-radius:0 4px 4px 4px;padding:6px}
+.chart-box{flex:1;min-width:0}
+.chart-lbl{font-size:8px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;text-align:center}
+.cdiv{height:210px;width:100%}
+.spd-row{margin-bottom:16px}
+.spd-hdrs{display:flex;gap:12px;align-items:flex-end}
+.spd-lbl{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--blue);padding:5px 10px;background:var(--bg2);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;display:inline-block}
+.ann-lbl{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--green);padding:5px 10px;background:var(--bg2);border:1px solid var(--border);border-bottom:none;border-radius:4px 4px 0 0;display:inline-block}
+.spd-charts{display:flex;gap:6px;background:var(--bg1);border:1px solid var(--border);border-radius:0 4px 4px 4px;padding:6px}
+.spd-box{flex:1;min-width:0}
+.sdiv{height:230px;width:100%}
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
 <header>
   <div class="logo">
-    <div class="logo-icon">🌾</div>
-    <div>
-      <div class="logo-title">COTTON FUTURES ANALYZER</div>
-      <div class="logo-sub">Bloomberg Historical Data · 2000–Present</div>
-    </div>
+    <span style="font-size:22px">🌾</span>
+    <div><div class="logo-title">COTTON FUTURES ANALYZER</div>
+    <div class="logo-sub">Roll-Adjusted · Seasonality · Spreads · 3-Check FND</div></div>
   </div>
-  <div id="meta">Loading data…</div>
+  <div id="meta">Loading…</div>
 </header>
 
-<!-- LOADING SCREEN -->
 <div id="loading-screen">
   <div class="spinner"></div>
-  <div class="loading-txt">Loading data/cotton_raw.csv …</div>
-  <div id="error-box">
-    <div class="error-icon">⚠️</div>
-    <div class="error-title">Could not load data file</div>
-    <div class="error-msg" id="error-msg"></div>
+  <div class="load-txt" id="load-msg">Fetching data/cotton_raw.csv …</div>
+  <div id="err-box">
+    <div class="err-title">⚠ Could Not Load Data</div>
+    <div class="err-msg" id="err-msg"></div>
   </div>
 </div>
 
-<!-- DASHBOARD (shown after data loads) -->
 <div id="dashboard">
-
   <div class="tabs">
     <div class="tabs-left">
-      <div class="tab active" onclick="showTab('abs',this)">📈 &nbsp;Seasonality — Daily Values</div>
-      <div class="tab"        onclick="showTab('pct',this)">📊 &nbsp;Seasonality — % from Jan 1</div>
-      <div class="tab"        onclick="showTab('tbl',this)">🎯 &nbsp;Percentile Dashboard</div>
+      <div class="tab active" onclick="showTab('sea-abs',this)">📈 Seasonality — Values</div>
+      <div class="tab"        onclick="showTab('sea-pct',this)">📊 Seasonality — % / Δpp from Jan</div>
+      <div class="tab"        onclick="showTab('spd-abs',this)">⚖ Spreads — Values</div>
+      <div class="tab"        onclick="showTab('spd-chg',this)">📉 Spreads — Δ from Jan</div>
     </div>
-    <div class="data-path">data: <b>data/cotton_raw.csv</b></div>
+    <div class="data-src">reads <b>data/cotton_raw.csv</b> + <b>data/fnd.csv</b></div>
   </div>
 
-  <!-- Seasonality — Absolute -->
-  <div id="panel-abs" class="panel active">
-    <div class="controls">
-      <div class="ctrl">
-        <div class="ctrl-lbl">Contract</div>
-        <select id="a-ct" onchange="drawAbs()"></select>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Field</div>
-        <select id="a-fd" onchange="drawAbs()"></select>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Year From</div>
-        <div class="rrow">
-          <input type="range" id="a-y1" oninput="document.getElementById('a-v1').textContent=this.value;drawAbs()">
-          <span class="rv" id="a-v1">2000</span>
-        </div>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Year To</div>
-        <div class="rrow">
-          <input type="range" id="a-y2" oninput="document.getElementById('a-v2').textContent=this.value;drawAbs()">
-          <span class="rv" id="a-v2">2025</span>
-        </div>
-      </div>
-      <button class="btn" onclick="setYears('a',META.y0,META.y1)">All Years</button>
-      <button class="btn" onclick="setYears('a',META.y1,META.y1)">Latest Only</button>
-      <button class="btn" onclick="setYears('a',META.y1-4,META.y1)">Last 5 Yrs</button>
+  <div class="year-bar">
+    <span class="yb-lbl">Years:</span>
+    <button class="mbtn active" id="btn-range" onclick="setMode('range')">Range</button>
+    <button class="mbtn"        id="btn-pick"  onclick="setMode('pick')">Pick</button>
+    <div id="year-range" style="display:flex;align-items:center;gap:8px">
+      <span class="yb-lbl">From</span>
+      <div class="rrow"><input type="range" id="yr-from" oninput="document.getElementById('vf').textContent=this.value;applyYears()"><span class="rv" id="vf">2020</span></div>
+      <span class="yb-lbl">To</span>
+      <div class="rrow"><input type="range" id="yr-to" oninput="document.getElementById('vt').textContent=this.value;applyYears()"><span class="rv" id="vt">2025</span></div>
     </div>
-    <div class="chart-wrap"><div id="chart-abs"></div></div>
+    <div id="year-pick"></div>
+    <button class="qbtn" onclick="quickSelect(5)">Last 5</button>
+    <button class="qbtn" onclick="quickSelect(10)">Last 10</button>
+    <button class="qbtn" onclick="quickSelect(999)">All Years</button>
   </div>
 
-  <!-- Seasonality — % Change -->
-  <div id="panel-pct" class="panel">
-    <div class="controls">
-      <div class="ctrl">
-        <div class="ctrl-lbl">Contract</div>
-        <select id="p-ct" onchange="drawPct()"></select>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Field</div>
-        <select id="p-fd" onchange="drawPct()"></select>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Year From</div>
-        <div class="rrow">
-          <input type="range" id="p-y1" oninput="document.getElementById('p-v1').textContent=this.value;drawPct()">
-          <span class="rv" id="p-v1">2000</span>
-        </div>
-      </div>
-      <div class="ctrl">
-        <div class="ctrl-lbl">Year To</div>
-        <div class="rrow">
-          <input type="range" id="p-y2" oninput="document.getElementById('p-v2').textContent=this.value;drawPct()">
-          <span class="rv" id="p-v2">2025</span>
-        </div>
-      </div>
-      <button class="btn" onclick="setYears('p',META.y0,META.y1)">All Years</button>
-      <button class="btn" onclick="setYears('p',META.y1,META.y1)">Latest Only</button>
-      <button class="btn" onclick="setYears('p',META.y1-4,META.y1)">Last 5 Yrs</button>
-    </div>
-    <div class="chart-wrap"><div id="chart-pct"></div></div>
-  </div>
-
-  <!-- Percentile Dashboard -->
-  <div id="panel-tbl" class="panel">
-    <div class="legend-row">
-      <span>Percentile colour key:</span>
-      <div class="leg"><div class="leg-sq" style="background:#c62828"></div><span style="color:#c62828">0–10</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#ef5350"></div><span style="color:#ef5350">10–25</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#ef6c00"></div><span style="color:#ef6c00">25–40</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#f9a825"></div><span style="color:#f9a825">40–60</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#7cb342"></div><span style="color:#7cb342">60–75</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#66bb6a"></div><span style="color:#66bb6a">75–90</span></div>
-      <div class="leg"><div class="leg-sq" style="background:#2e7d32"></div><span style="color:#2e7d32">90–100</span></div>
-    </div>
-    <div class="tbl-wrap" id="tbl-container"></div>
-    <div class="note" id="tbl-note"></div>
-  </div>
-
+  <div id="panel-sea-abs" class="panel active" data-rendered="false"></div>
+  <div id="panel-sea-pct" class="panel"        data-rendered="false"></div>
+  <div id="panel-spd-abs" class="panel"        data-rendered="false"></div>
+  <div id="panel-spd-chg" class="panel"        data-rendered="false"></div>
 </div>
 
 <script>
-// ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const CONTRACTS  = ['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
-const FIELDS     = ['PX_LAST','OPEN_INT','HIST_CALL_IMP_VOL'];
-const FIELD_NICE = {PX_LAST:'Price (¢/lb)', OPEN_INT:'Open Interest', HIST_CALL_IMP_VOL:'Impl. Vol (%)'};
-const YEAR_COLORS = [
-  '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45',
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const CONTRACTS=['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
+const FIELDS=['PX_LAST','OPEN_INT','HIST_CALL_IMP_VOL'];
+const FLD_NICE={PX_LAST:'Price (¢/lb)',OPEN_INT:'Open Interest',HIST_CALL_IMP_VOL:'Impl. Vol (%)'};
+const SPREAD_TYPES=['MAR_MAY','MAY_JUL','JUL_DEC','DEC_MAR'];
+const SPREAD_NICE={'MAR_MAY':'Mar / May','MAY_JUL':'May / Jul','JUL_DEC':'Jul / Dec','DEC_MAR':'Dec / Mar'};
+const ANNUAL_TYPES=['MAR','MAY','JUL','DEC'];
+const ANNUAL_NICE={MAR:'Mar1 – Mar2',MAY:'May1 – May2',JUL:'Jul1 – Jul2',DEC:'Dec1 – Dec2'};
+const MONTH_IDX={mar:2,may:4,jul:6,dec:11};
+const COLORS=['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45',
   '#fabed4','#469990','#dcbeff','#9A6324','#fffac8','#800000','#aaffc3','#808000',
-  '#ffd8b1','#000075','#a9a9a9','#e0e0e0','#e6beff','#ffe119','#00BFFF','#FF69B4',
-  '#7FFF00','#FF4500',
-];
+  '#ffd8b1','#000075','#c8c8c8','#ffffff','#e6beff','#ffe119','#00BFFF','#FF69B4','#7FFF00','#FF4500'];
 
-let SEA={}, PCT={}, ROWS=[], META={};
+// ── STATE ────────────────────────────────────────────────────────────────────
+let DATA={},DATA_ARR={},FNDS={},UPLOADED_FNDS={};
+let SEA={},SEA_PCT={},SPD={},SPD_CHG={},ANN={},ANN_CHG={};
+let META={},ACTIVE_YEARS=[],yearMode='range';
 
-// ── FETCH CSV FROM REPO ───────────────────────────────────────────────────────
-window.onload = () => {
-  fetch('data/cotton_raw.csv')
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status} — make sure data/cotton_raw.csv exists in the repo`);
-      return r.text();
-    })
-    .then(csv => {
-      Papa.parse(csv, {
-        header: false,
-        skipEmptyLines: true,
-        complete: res => processData(res.data),
-      });
-    })
-    .catch(err => showError(err.message));
+// ── FND CALCULATION ───────────────────────────────────────────────────────────
+function calcFND(year,mIdx){
+  const d=new Date(year,mIdx,1);
+  while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
+  let c=0;while(c<5){d.setDate(d.getDate()-1);if(d.getDay()!==0&&d.getDay()!==6)c++;}
+  return new Date(d);
+}
+function getFND(type,year){
+  const k=type+year;
+  return UPLOADED_FNDS[k]?new Date(UPLOADED_FNDS[k]):calcFND(year,MONTH_IDX[type]);
+}
+function buildAllFNDs(y0,y1){
+  FNDS={mar:[],may:[],jul:[],dec:[]};
+  for(let y=y0-1;y<=y1+2;y++)
+    for(const t of['mar','may','jul','dec'])FNDS[t].push(getFND(t,y));
+  for(const t of['mar','may','jul','dec'])FNDS[t].sort((a,b)=>a-b);
+}
+function prevFND(type,date){
+  const dt=date.getTime();let p=null;
+  for(const f of FNDS[type]){if(f.getTime()<=dt)p=f;else break;}
+  return p;
+}
+
+// ── 3-CHECK ROLL DETECTION ────────────────────────────────────────────────────
+// Primary: FND calculation. Checks 2+3 refine within ±3 days if needed.
+function refineFND(calcDate,priceArr,oiArr){
+  const ct=calcDate.getTime(),WIN=3*86400000;
+  // Check 2: price jump backstop (>4.5%)
+  for(let i=1;i<priceArr.length;i++){
+    if(Math.abs(priceArr[i].date.getTime()-ct)<=WIN){
+      if(Math.abs(priceArr[i].value-priceArr[i-1].value)/priceArr[i-1].value>0.045)
+        return priceArr[i].date;
+    }
+  }
+  // Check 3: OI spike after recent low (OI drops then spikes >30% in 25-day window)
+  if(oiArr&&oiArr.length>25){
+    for(let i=25;i<oiArr.length;i++){
+      if(Math.abs(oiArr[i].date.getTime()-ct)<=WIN){
+        const low=Math.min(...oiArr.slice(i-25,i).map(p=>p.value));
+        if(oiArr[i].value>low*1.30&&oiArr[i].value>oiArr[i-1].value*1.15)
+          return oiArr[i].date;
+      }
+    }
+  }
+  return calcDate;
+}
+
+// ── SPREAD CONTRACT SELECTION ─────────────────────────────────────────────────
+// Rules (see README):
+// MAR_MAY: May_FND>Mar_FND → Mar1-May1  else Mar1-May2
+// MAY_JUL: Jul_FND>May_FND → May1-Jul1  else May1-Jul2
+// JUL_DEC: Dec_FND>Jul_FND → Jul1-Dec1  else Jul1-Dec2
+// DEC_MAR: Mar_FND>Dec_FND → Dec1-Mar1  else Dec1-Mar2
+function getSpreadPair(date,type){
+  const T=d=>d?d.getTime():-Infinity;
+  const pM=T(prevFND('mar',date)),pY=T(prevFND('may',date));
+  const pJ=T(prevFND('jul',date)),pD=T(prevFND('dec',date));
+  if(type==='MAR_MAY')return pY>pM?{a:'CTMAR1',b:'CTMAY1'}:{a:'CTMAR1',b:'CTMAY2'};
+  if(type==='MAY_JUL')return pJ>pY?{a:'CTMAY1',b:'CTJUL1'}:{a:'CTMAY1',b:'CTJUL2'};
+  if(type==='JUL_DEC')return pD>pJ?{a:'CTJUL1',b:'CTDEC1'}:{a:'CTJUL1',b:'CTDEC2'};
+  if(type==='DEC_MAR')return pM>pD?{a:'CTDEC1',b:'CTMAR1'}:{a:'CTDEC1',b:'CTMAR2'};
+}
+
+// ── DATA LOADING ──────────────────────────────────────────────────────────────
+window.onload=()=>{
+  const fndP=fetch('data/fnd.csv').then(r=>r.ok?r.text():'').then(t=>{if(t)parseFND(t);}).catch(()=>{});
+  const datP=fetch('data/cotton_raw.csv').then(r=>{
+    if(!r.ok)throw new Error(`HTTP ${r.status} — data/cotton_raw.csv not found in repo`);
+    return r.text();
+  });
+  setMsg('Fetching data files…');
+  Promise.all([fndP,datP]).then(([,csv])=>{setMsg('Parsing CSV…');setTimeout(()=>parseMain(csv),40);})
+    .catch(e=>showErr(e.message));
 };
 
-function showError(msg) {
-  document.querySelector('.spinner').style.display    = 'none';
-  document.querySelector('.loading-txt').style.display = 'none';
-  document.getElementById('error-box').style.display  = 'block';
-  document.getElementById('error-msg').innerHTML =
-    `<b style="color:#ef5350">${msg}</b><br><br>` +
-    `Make sure your Bloomberg CSV is committed to the repo at:<br>` +
-    `<code>data/cotton_raw.csv</code><br><br>` +
-    `The file must be on the same branch as <code>index.html</code> ` +
-    `and GitHub Pages must be enabled.`;
+function setMsg(m){document.getElementById('load-msg').textContent=m;}
+
+function parseFND(csv){
+  for(const line of csv.trim().split('\n').slice(1)){
+    const p=line.split(',');if(p.length<2)continue;
+    const sym=p[0].trim(),ds=p[1].trim();if(!sym||!ds)continue;
+    const m=sym.match(/^([A-Za-z]+)(\d+)$/);if(!m)continue;
+    const mon=m[1].toLowerCase().substring(0,3);
+    const yr=parseInt(m[2])+(parseInt(m[2])<100?2000:0);
+    const dp=ds.split('/').map(Number);if(dp.length<3)continue;
+    UPLOADED_FNDS[mon+yr]=new Date(dp[2],dp[0]-1,dp[1]);
+  }
 }
 
-// ── PARSE ─────────────────────────────────────────────────────────────────────
-function processData(raw) {
-  const headers = raw[0];
-  const dataRows = raw.slice(1);
-
-  // Map column index → {contract, field}
-  const colMap = {};
-  for (let i = 1; i < headers.length; i++) {
-    const parts = headers[i].trim().split(/\s+/);
-    if (parts.length >= 3) {
-      const contract = parts[0], field = parts[parts.length - 1];
-      if (CONTRACTS.includes(contract) && FIELDS.includes(field))
-        colMap[i] = { contract, field };
+function parseMain(csv){
+  const raw=Papa.parse(csv,{header:false,skipEmptyLines:true}).data;
+  const headers=raw[0];
+  const colMap={};
+  for(let i=1;i<headers.length;i++){
+    const p=headers[i].trim().split(/\s+/);
+    if(p.length>=3&&CONTRACTS.includes(p[0])&&FIELDS.includes(p[p.length-1]))
+      colMap[i]={contract:p[0],field:p[p.length-1]};
+  }
+  for(const c of CONTRACTS){DATA[c]={};DATA_ARR[c]={};for(const f of FIELDS){DATA[c][f]=new Map();}}
+  let n=0;
+  for(let ri=1;ri<raw.length;ri++){
+    const row=raw[ri];
+    const date=pDate((row[0]||'').trim());if(!date)continue;
+    const dk=dKey(date);
+    for(const[idx,cf]of Object.entries(colMap)){
+      const rv=(row[idx]||'').trim();
+      if(!rv||rv.includes('N/A'))continue;
+      const v=parseFloat(rv);if(isNaN(v))continue;
+      DATA[cf.contract][cf.field].set(dk,v);n++;
     }
   }
-
-  // Build records, exclude #N/A N/A
-  const records = [];
-  for (const row of dataRows) {
-    const date = parseDate((row[0] || '').trim());
-    if (!date) continue;
-    for (const [idx, cf] of Object.entries(colMap)) {
-      const raw = (row[idx] || '').trim();
-      if (!raw || raw.includes('N/A') || raw === '') continue;
-      const val = parseFloat(raw);
-      if (!isNaN(val)) records.push({ date, contract: cf.contract, field: cf.field, value: val });
-    }
+  for(const c of CONTRACTS)for(const f of FIELDS){
+    const arr=[];DATA[c][f].forEach((v,dk)=>arr.push({date:dKeyToDate(dk),value:v}));
+    arr.sort((a,b)=>a.date-b.date);DATA_ARR[c][f]=arr;
   }
-
-  if (!records.length) { showError('No valid data rows found — check the CSV format.'); return; }
-
-  records.sort((a, b) => a.date - b.date);
-
-  const yMin   = new Date(Math.min(...records.map(r=>r.date))).getFullYear();
-  const yMax   = new Date(Math.max(...records.map(r=>r.date))).getFullYear();
-  const latest = new Date(Math.max(...records.map(r=>r.date)));
-
-  META = { y0:yMin, y1:yMax, latest:fmtDate(latest),
-           n:records.length, days:new Set(records.map(r=>r.date.toDateString())).size };
-
-  buildSeasonality(records);
-  buildPctChange(records);
-  buildPercentileRows(records);
-  initDashboard();
+  const dates=DATA_ARR.CTMAR1.PX_LAST.map(p=>p.date);
+  if(!dates.length){showErr('No valid data rows found.');return;}
+  const y0=dates[0].getFullYear(),y1=dates[dates.length-1].getFullYear();
+  META={y0,y1,latest:fmtD(dates[dates.length-1]),n};
+  setMsg('Computing roll dates (3-check)…');
+  setTimeout(()=>{buildAllFNDs(y0,y1);setMsg('Building seasonality…');
+    setTimeout(()=>{buildSeasonality();setMsg('Computing spreads…');
+      setTimeout(()=>{buildSpreads();initDash();},40);},40);},40);
 }
 
-function parseDate(s) {
-  const p = s.split('/');
-  if (p.length !== 3) return null;
-  let [m,d,y] = p.map(Number);
-  if (y < 100) y += (y < 50 ? 2000 : 1900);
-  const dt = new Date(y, m-1, d);
-  return isNaN(dt.getTime()) ? null : dt;
-}
-
-function fmtDate(d) {
-  return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
-}
-
-function getDOY(date) {
-  return Math.floor((date - new Date(date.getFullYear(),0,0)) / 86400000);
-}
-
-// ── BUILD SEASONALITY DATA ────────────────────────────────────────────────────
-function groupRecords(records) {
-  const out = {};
-  for (const c of CONTRACTS) { out[c]={}; for (const f of FIELDS) out[c][f]={}; }
-  for (const r of records) {
-    if (!out[r.contract]?.[r.field]) continue;
-    const yr = r.date.getFullYear().toString();
-    const doy = getDOY(r.date);
-    if (!out[r.contract][r.field][yr]) out[r.contract][r.field][yr] = {};
-    out[r.contract][r.field][yr][doy] = r.value; // last-write wins → dedup
-  }
-  // Convert to sorted arrays
-  for (const c of CONTRACTS) for (const f of FIELDS) for (const yr in out[c][f]) {
-    const obj = out[c][f][yr];
-    const sorted = Object.entries(obj).sort((a,b)=>+a[0]-+b[0]);
-    out[c][f][yr] = { doy: sorted.map(x=>+x[0]), val: sorted.map(x=>x[1]) };
-  }
-  return out;
-}
-
-function buildSeasonality(records) {
-  SEA = groupRecords(records);
-}
-
-function buildPctChange(records) {
-  const grp = groupRecords(records);
-  PCT = {};
-  for (const c of CONTRACTS) {
-    PCT[c] = {};
-    for (const f of FIELDS) {
-      PCT[c][f] = {};
-      for (const yr in grp[c][f]) {
-        const { doy, val } = grp[c][f][yr];
-        const base = val[0];
-        if (!base || base === 0) continue;
-        PCT[c][f][yr] = { doy, val: val.map(v => +((v/base - 1)*100).toFixed(3)) };
+// ── SEASONALITY ───────────────────────────────────────────────────────────────
+function buildSeasonality(){
+  SEA={};SEA_PCT={};
+  for(const c of CONTRACTS){SEA[c]={};SEA_PCT[c]={};
+    for(const f of FIELDS){
+      const tmp={};
+      for(const pt of DATA_ARR[c][f]){
+        const yr=pt.date.getFullYear().toString(),doy=getDOY(pt.date);
+        if(!tmp[yr])tmp[yr]={};tmp[yr][doy]=pt.value;
       }
-    }
-  }
-}
-
-// ── PERCENTILE CALCULATIONS ───────────────────────────────────────────────────
-function buildPercentileRows(records) {
-  ROWS = [];
-  for (const c of CONTRACTS) {
-    for (const f of FIELDS) {
-      const pts = records
-        .filter(r => r.contract===c && r.field===f)
-        .sort((a,b) => a.date-b.date);
-
-      const row = { contract:c, field:f, field_nice:FIELD_NICE[f], current:null, date:'—' };
-      for (const lb of [5,10,25]) row['pct'+lb]=row['min'+lb]=row['max'+lb]=null, row['n'+lb]=0;
-
-      if (!pts.length) { ROWS.push(row); continue; }
-
-      const latest = pts[pts.length-1];
-      row.current = +latest.value.toFixed(2);
-      row.date    = fmtDate(latest.date);
-
-      for (const lb of [5,10,25]) {
-        const cutoff = lb < 25
-          ? new Date(new Date(latest.date).setFullYear(latest.date.getFullYear()-lb))
-          : null;
-        const hist = (cutoff
-          ? pts.filter(p => p.date>cutoff && p.date<=latest.date)
-          : pts.filter(p => p.date<=latest.date)
-        ).map(p=>p.value);
-
-        if (hist.length < 10) { row['n'+lb]=hist.length; continue; }
-        const cur = latest.value;
-        row['pct'+lb] = +((hist.filter(v=>v<cur).length / hist.length)*100).toFixed(1);
-        row['min'+lb] = +Math.min(...hist).toFixed(2);
-        row['max'+lb] = +Math.max(...hist).toFixed(2);
-        row['n'+lb]   = hist.length;
+      const abs={},pct={};
+      for(const yr in tmp){
+        const entries=Object.entries(tmp[yr]).sort((a,b)=>+a[0]-+b[0]);
+        const doys=entries.map(e=>+e[0]),vals=entries.map(e=>e[1]);
+        abs[yr]={doy:doys,val:vals};
+        const base=vals[0];
+        if(!base||base===0){pct[yr]={doy:doys,val:vals};continue;}
+        pct[yr]={doy:doys,val:f==='HIST_CALL_IMP_VOL'
+          ?vals.map(v=>+(v-base).toFixed(3))
+          :vals.map(v=>+((v/base-1)*100).toFixed(3))};
       }
-      ROWS.push(row);
+      SEA[c][f]=abs;SEA_PCT[c][f]=pct;
     }
   }
 }
 
-// ── INIT DASHBOARD ────────────────────────────────────────────────────────────
-function initDashboard() {
-  document.getElementById('loading-screen').style.display = 'none';
-  document.getElementById('dashboard').style.display      = 'block';
+// ── SPREADS ───────────────────────────────────────────────────────────────────
+function buildSpreads(){
+  for(const t of SPREAD_TYPES){SPD[t]={};SPD_CHG[t]={};}
+  for(const t of ANNUAL_TYPES){ANN[t]={};ANN_CHG[t]={};}
+  const dates=DATA_ARR.CTMAR1.PX_LAST.map(p=>p.date);
 
-  document.getElementById('meta').innerHTML =
-    `Range: <b>${META.y0}–${META.y1}</b> &nbsp;|&nbsp; Latest: <b>${META.latest}</b><br>` +
-    `Days: <b>${META.days.toLocaleString()}</b> &nbsp;|&nbsp; Records: <b>${META.n.toLocaleString()}</b>`;
+  // Calendar spreads
+  for(const sType of SPREAD_TYPES){
+    const tmp={};
+    for(const date of dates){
+      const cf=getSpreadPair(date,sType);if(!cf)continue;
+      const dk=dKey(date),va=DATA[cf.a].PX_LAST.get(dk),vb=DATA[cf.b].PX_LAST.get(dk);
+      if(va===undefined||vb===undefined)continue;
+      const yr=date.getFullYear().toString(),doy=getDOY(date);
+      if(!tmp[yr])tmp[yr]={};tmp[yr][doy]=+(va-vb).toFixed(3);
+    }
+    for(const yr in tmp){
+      const e=Object.entries(tmp[yr]).sort((a,b)=>+a[0]-+b[0]);
+      const doys=e.map(x=>+x[0]),vals=e.map(x=>x[1]),base=vals[0];
+      SPD[sType][yr]={doy:doys,val:vals};
+      SPD_CHG[sType][yr]={doy:doys,val:vals.map(v=>+(v-base).toFixed(3))};
+    }
+  }
 
-  ['a','p'].forEach(x => {
-    ['ct','fd'].forEach(id => {
-      const el = document.getElementById(x+'-'+id);
-      el.innerHTML = '';
-      (id==='ct' ? CONTRACTS : FIELDS).forEach(v =>
-        el.innerHTML += `<option value="${v}">${id==='fd' ? FIELD_NICE[v] : v}</option>`);
+  // Annual spreads
+  for(const aType of ANNUAL_TYPES){
+    const c1='CT'+aType+'1',c2='CT'+aType+'2',tmp={};
+    for(const date of dates){
+      const dk=dKey(date),va=DATA[c1].PX_LAST.get(dk),vb=DATA[c2].PX_LAST.get(dk);
+      if(va===undefined||vb===undefined)continue;
+      const yr=date.getFullYear().toString(),doy=getDOY(date);
+      if(!tmp[yr])tmp[yr]={};tmp[yr][doy]=+(va-vb).toFixed(3);
+    }
+    for(const yr in tmp){
+      const e=Object.entries(tmp[yr]).sort((a,b)=>+a[0]-+b[0]);
+      const doys=e.map(x=>+x[0]),vals=e.map(x=>x[1]),base=vals[0];
+      ANN[aType][yr]={doy:doys,val:vals};
+      ANN_CHG[aType][yr]={doy:doys,val:vals.map(v=>+(v-base).toFixed(3))};
+    }
+  }
+}
+
+// ── DASHBOARD INIT ────────────────────────────────────────────────────────────
+function initDash(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('meta').innerHTML=
+    `Range: <b>${META.y0}–${META.y1}</b> &nbsp;|&nbsp; Latest: <b>${META.latest}</b> &nbsp;|&nbsp; Records: <b>${META.n.toLocaleString()}</b><br>`+
+    `FND: 3-check (calc rule + price jump + OI spike). Uploaded FND file used for 2026+`;
+  const yf=document.getElementById('yr-from'),yt=document.getElementById('yr-to');
+  yf.min=META.y0;yf.max=META.y1;yf.value=Math.max(META.y0,META.y1-4);
+  yt.min=META.y0;yt.max=META.y1;yt.value=META.y1;
+  document.getElementById('vf').textContent=yf.value;
+  document.getElementById('vt').textContent=yt.value;
+  const pp=document.getElementById('year-pick');
+  for(let y=META.y1;y>=META.y0;y--){
+    const c=document.createElement('div');c.className='yc';c.textContent=y;
+    c.dataset.year=y;c.onclick=()=>{c.classList.toggle('on');applyYears();};pp.appendChild(c);
+  }
+  applyYears();
+  buildPanelDOM('panel-sea-abs');
+  renderPanel('panel-sea-abs');
+}
+
+// ── PANEL DOM ─────────────────────────────────────────────────────────────────
+function buildPanelDOM(pid){
+  const panel=document.getElementById(pid);
+  if(panel.querySelector('.ct-row,.spd-row'))return;
+  if(pid.includes('sea')){
+    CONTRACTS.forEach(c=>{
+      const row=document.createElement('div');row.className='ct-row';
+      row.innerHTML=`<div class="ct-lbl">${c}</div>`+
+        `<div class="charts-row">`+
+        FIELDS.map(f=>`<div class="chart-box"><div class="chart-lbl">${FLD_NICE[f]}</div>`+
+          `<div class="cdiv" id="ch-${pid}-${c}-${f}"></div></div>`).join('')+
+        `</div>`;
+      panel.appendChild(row);
     });
-    ['y1','y2'].forEach(id => {
-      const el = document.getElementById(x+'-'+id);
-      el.min = META.y0; el.max = META.y1;
-      el.value = id==='y1' ? META.y0 : META.y1;
-      document.getElementById(x+'-v'+id.slice(1)).textContent = el.value;
+  }
+  if(pid.includes('spd')){
+    SPREAD_TYPES.forEach((sType,i)=>{
+      const aType=ANNUAL_TYPES[i];
+      const row=document.createElement('div');row.className='spd-row';
+      row.innerHTML=
+        `<div class="spd-hdrs"><div class="spd-lbl">${SPREAD_NICE[sType]} &nbsp;<small style="font-size:7px;color:var(--txt3)">Calendar</small></div>`+
+        `<div class="ann-lbl">${ANNUAL_NICE[aType]} &nbsp;<small style="font-size:7px;color:var(--txt3)">Annual</small></div></div>`+
+        `<div class="spd-charts">`+
+          `<div class="spd-box"><div class="chart-lbl">${SPREAD_NICE[sType]} — Price spread (¢/lb)</div>`+
+            `<div class="sdiv" id="ch-${pid}-cal-${sType}"></div></div>`+
+          `<div class="spd-box"><div class="chart-lbl">${ANNUAL_NICE[aType]} — Price spread (¢/lb)</div>`+
+            `<div class="sdiv" id="ch-${pid}-ann-${aType}"></div></div>`+
+        `</div>`;
+      panel.appendChild(row);
     });
+  }
+}
+
+// ── CHART RENDERING ───────────────────────────────────────────────────────────
+const LAYOUT=(yLbl,zl)=>({
+  xaxis:{title:{text:'Day of Year',font:{size:8}},color:'#394f60',gridcolor:'#0c1218',
+    tickvals:[1,32,60,91,121,152,182,213,244,274,305,335],
+    ticktext:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    range:[1,366],showline:true,linecolor:'#1b2a38',tickfont:{size:7}},
+  yaxis:{color:'#394f60',gridcolor:'#0c1218',title:{text:yLbl,font:{size:8}},
+    zeroline:zl,zerolinecolor:'#1c3040',zerolinewidth:1,
+    showline:true,linecolor:'#1b2a38',tickfont:{size:7}},
+  plot_bgcolor:'#06080a',paper_bgcolor:'#0b0f13',
+  font:{color:'#6a8294',family:'IBM Plex Mono',size:8},
+  showlegend:true,
+  legend:{x:1.01,y:1,bgcolor:'rgba(0,0,0,0)',font:{size:7},
+    title:{text:'Yr',font:{color:'#c8a96e',size:7}}},
+  hovermode:'closest',margin:{l:44,r:56,t:6,b:34}
+});
+
+function mkTraces(dataObj,years){
+  if(!dataObj)return[];
+  const ly=years.at(-1)?.toString();
+  return years.map((yr,i)=>{
+    const ys=yr.toString();if(!dataObj[ys])return null;
+    const{doy,val}=dataObj[ys];
+    return{x:doy,y:val,mode:'lines',name:ys,
+      line:{color:COLORS[i%COLORS.length],width:ys===ly?2.4:1},opacity:ys===ly?1:0.6,
+      hovertemplate:`<b>${ys}</b> DoY %{x} → %{y:.2f}<extra></extra>`};
+  }).filter(Boolean);
+}
+
+function renderChart(id,dataObj,yLbl,zl){
+  const el=document.getElementById(id);if(!el)return;
+  Plotly.react(el,mkTraces(dataObj,ACTIVE_YEARS),LAYOUT(yLbl,zl),
+    {responsive:true,displayModeBar:false});
+}
+
+function renderPanel(pid){
+  buildPanelDOM(pid);
+  const isAbs=pid.includes('abs'),isSea=pid.includes('sea');
+  if(isSea){
+    CONTRACTS.forEach(c=>FIELDS.forEach(f=>{
+      const obj=isAbs?SEA[c][f]:SEA_PCT[c][f];
+      const isVol=f==='HIST_CALL_IMP_VOL';
+      const yLbl=isAbs?FLD_NICE[f]:isVol?'Δ pp from Jan 1':'% Δ from Jan 1';
+      renderChart(`ch-${pid}-${c}-${f}`,obj,yLbl,!isAbs);
+    }));
+  } else {
+    const yLbl=isAbs?'Spread (¢/lb)':'Δ from Jan 1 (¢)';
+    SPREAD_TYPES.forEach((sType,i)=>{
+      const aType=ANNUAL_TYPES[i];
+      renderChart(`ch-${pid}-cal-${sType}`,isAbs?SPD[sType]:SPD_CHG[sType],yLbl,!isAbs);
+      renderChart(`ch-${pid}-ann-${aType}`,isAbs?ANN[aType]:ANN_CHG[aType],yLbl,!isAbs);
+    });
+  }
+  document.getElementById(pid).dataset.rendered='true';
+}
+
+function updateAll(){
+  ['panel-sea-abs','panel-sea-pct','panel-spd-abs','panel-spd-chg'].forEach(p=>{
+    if(document.getElementById(p).dataset.rendered==='true')renderPanel(p);
   });
-
-  drawAbs();
-  buildTable();
 }
 
-// ── TAB SWITCHER ──────────────────────────────────────────────────────────────
-function showTab(id, el) {
+// ── UI ────────────────────────────────────────────────────────────────────────
+function showTab(id,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('panel-'+id).classList.add('active');
-  el.classList.add('active');
-  if (id==='abs') drawAbs();
-  if (id==='pct') drawPct();
+  document.getElementById('panel-'+id).classList.add('active');el.classList.add('active');
+  const pid='panel-'+id;
+  if(document.getElementById(pid).dataset.rendered!=='true')renderPanel(pid);
+}
+function setMode(m){
+  yearMode=m;
+  document.getElementById('btn-range').classList.toggle('active',m==='range');
+  document.getElementById('btn-pick').classList.toggle('active',m==='pick');
+  document.getElementById('year-range').style.display=m==='range'?'flex':'none';
+  document.getElementById('year-pick').style.display=m==='pick'?'flex':'none';
+  applyYears();
+}
+function applyYears(){
+  if(yearMode==='range'){
+    const y1=+document.getElementById('yr-from').value,y2=+document.getElementById('yr-to').value;
+    ACTIVE_YEARS=[];for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++)ACTIVE_YEARS.push(y);
+  } else {
+    ACTIVE_YEARS=[...document.querySelectorAll('.yc.on')].map(c=>+c.dataset.year).sort();
+    if(!ACTIVE_YEARS.length)ACTIVE_YEARS=[META.y1];
+  }
+  updateAll();
+}
+function quickSelect(n){
+  if(yearMode==='pick'){
+    document.querySelectorAll('.yc').forEach(c=>c.classList.toggle('on',+c.dataset.year>META.y1-n));
+    applyYears();
+  } else {
+    const f=n>=999?META.y0:Math.max(META.y0,META.y1-n+1);
+    document.getElementById('yr-from').value=f;document.getElementById('vf').textContent=f;
+    document.getElementById('yr-to').value=META.y1;document.getElementById('vt').textContent=META.y1;
+    applyYears();
+  }
 }
 
-// ── CHARTS ────────────────────────────────────────────────────────────────────
-function chartLayout(yLabel, title, zeroline) {
-  return {
-    title:{ text:title, font:{color:'#c8a96e',size:12,family:'IBM Plex Mono'}, x:0.01 },
-    xaxis:{
-      title:'Day of Year', color:'#394f60', gridcolor:'#0b0f13',
-      tickvals:[1,32,60,91,121,152,182,213,244,274,305,335],
-      ticktext:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-      range:[1,366], showline:true, linecolor:'#1b2a38',
-    },
-    yaxis:{
-      title:yLabel, color:'#394f60', gridcolor:'#0b0f13',
-      zeroline, zerolinecolor:'#1c3040', zerolinewidth:1.5,
-      showline:true, linecolor:'#1b2a38',
-    },
-    plot_bgcolor:'#06080a', paper_bgcolor:'#0b0f13',
-    font:{color:'#6a8294', family:'IBM Plex Mono'},
-    legend:{x:1.01,y:1,bgcolor:'rgba(0,0,0,0)',bordercolor:'#1b2a38',borderwidth:1,
-      font:{size:9},title:{text:'Year',font:{color:'#c8a96e'}}},
-    hovermode:'closest',
-    margin:{l:60,r:110,t:48,b:50},
-  };
-}
-
-function makeTraces(data, contract, field, y1, y2) {
-  const years = Object.keys(data[contract]?.[field]||{})
-    .filter(y=>+y>=y1 && +y<=y2).sort();
-  const latest = years.at(-1);
-  return years.map((yr,i) => {
-    const d = data[contract][field][yr];
-    const isLatest = yr===latest;
-    return {
-      x:d.doy, y:d.val, mode:'lines', name:yr,
-      line:{color:YEAR_COLORS[i%YEAR_COLORS.length], width:isLatest?2.8:1.1},
-      opacity:isLatest?1:0.6,
-      hovertemplate:`<b>${yr}</b><br>DoY %{x}<br>%{y:.2f}<extra></extra>`,
-    };
-  });
-}
-
-function drawAbs() {
-  const c=document.getElementById('a-ct').value, f=document.getElementById('a-fd').value;
-  const y1=+document.getElementById('a-y1').value, y2=+document.getElementById('a-y2').value;
-  Plotly.react('chart-abs', makeTraces(SEA,c,f,y1,y2),
-    chartLayout(FIELD_NICE[f],`${c}  ·  ${FIELD_NICE[f]}  —  Seasonality (Daily Values)`,false),
-    {responsive:true,displayModeBar:true,scrollZoom:true});
-}
-
-function drawPct() {
-  const c=document.getElementById('p-ct').value, f=document.getElementById('p-fd').value;
-  const y1=+document.getElementById('p-y1').value, y2=+document.getElementById('p-y2').value;
-  Plotly.react('chart-pct', makeTraces(PCT,c,f,y1,y2),
-    chartLayout('% Change from Jan 1',`${c}  ·  ${FIELD_NICE[f]}  —  Seasonality (% from Year Start)`,true),
-    {responsive:true,displayModeBar:true,scrollZoom:true});
-}
-
-function setYears(x,y1,y2) {
-  y1=Math.max(META.y0,y1); y2=Math.min(META.y1,y2);
-  document.getElementById(x+'-y1').value=y1; document.getElementById(x+'-v1').textContent=y1;
-  document.getElementById(x+'-y2').value=y2; document.getElementById(x+'-v2').textContent=y2;
-  x==='a'?drawAbs():drawPct();
-}
-
-// ── PERCENTILE TABLE ──────────────────────────────────────────────────────────
-function pctColor(p) {
-  if (p===null) return '#394f60';
-  if (p<10)  return '#c62828';
-  if (p<25)  return '#ef5350';
-  if (p<40)  return '#ef6c00';
-  if (p<60)  return '#f9a825';
-  if (p<75)  return '#7cb342';
-  if (p<90)  return '#66bb6a';
-  return '#2e7d32';
-}
-function fmt(v) {
-  if (v===null||v===undefined) return '—';
-  return Math.abs(v)>=10000 ? v.toLocaleString('en',{maximumFractionDigits:0})
-       : Math.abs(v)>=100   ? v.toFixed(1) : v.toFixed(2);
-}
-function barCell(row, lb) {
-  const p=row['pct'+lb], cur=row.current, mn=row['min'+lb], mx=row['max'+lb], n=row['n'+lb];
-  if (p===null||cur===null) return `<td class="bc"><div class="na">N/A</div></td>`;
-  const col=pctColor(p), pv=Math.max(0,Math.min(100,p));
-  return `<td class="bc">
-    <div class="bh"><span>${fmt(mn)}</span>
-      <span class="bpct" style="color:${col}">${p.toFixed(0)}%ile</span>
-    <span>${fmt(mx)}</span></div>
-    <div class="bt">
-      <div class="bf" style="width:${pv.toFixed(1)}%;background:linear-gradient(90deg,#080e08,${col})"></div>
-      <div class="bk" style="left:${pv.toFixed(1)}%"></div>
-    </div>
-    <div class="bv" style="color:${col}">${fmt(cur)}</div>
-    <div class="bn">n=${n.toLocaleString()}</div>
-  </td>`;
-}
-function buildTable() {
-  let h=`<table><thead>
-    <tr>
-      <th rowspan="2">Contract</th><th rowspan="2">Field</th>
-      <th style="border-left:2px solid var(--border);color:var(--blue)">5-Year Percentile</th>
-      <th style="border-left:2px solid var(--border);color:var(--blue)">10-Year Percentile</th>
-      <th style="border-left:2px solid var(--border);color:var(--blue)">25-Year Percentile</th>
-    </tr><tr>
-      <th style="border-left:2px solid var(--border)">Current vs 5yr Range</th>
-      <th style="border-left:2px solid var(--border)">Current vs 10yr Range</th>
-      <th style="border-left:2px solid var(--border)">Current vs 25yr Range</th>
-    </tr></thead><tbody>`;
-  let last=null;
-  ROWS.forEach(r => {
-    const isFirst=r.contract!==last; last=r.contract;
-    const bg=CONTRACTS.indexOf(r.contract)%2===0?'#0b0f13':'#090d11';
-    h+=`<tr class="${isFirst?'first-row':''}" style="background:${bg}">`;
-    if (isFirst) h+=`<td class="td-c" rowspan="${FIELDS.length}">${r.contract}</td>`;
-    h+=`<td class="td-f">${r.field_nice}</td>`;
-    h+=barCell(r,5)+barCell(r,10)+barCell(r,25);
-    h+=`</tr>`;
-  });
-  h+=`</tbody></table>`;
-  document.getElementById('tbl-container').innerHTML=h;
-  document.getElementById('tbl-note').textContent=
-    `Values as of ${META.latest}  ·  #N/A N/A values excluded from all calculations — never interpolated`;
+// ── UTILITIES ─────────────────────────────────────────────────────────────────
+function pDate(s){const p=s.split('/');if(p.length!==3)return null;let[m,d,y]=p.map(Number);if(y<100)y+=y<50?2000:1900;const dt=new Date(y,m-1,d);return isNaN(dt.getTime())?null:dt;}
+function dKey(d){return`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;}
+function dKeyToDate(k){const[y,m,d]=k.split('-').map(Number);return new Date(y,m,d);}
+function getDOY(d){return Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);}
+function fmtD(d){return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
+function showErr(msg){
+  document.querySelector('.spinner').style.display='none';
+  document.getElementById('load-msg').style.display='none';
+  document.getElementById('err-box').style.display='block';
+  document.getElementById('err-msg').innerHTML=
+    `<b style="color:#ef5350">${msg}</b><br><br>`+
+    `Files needed in repo:<br><code>data/cotton_raw.csv</code> — Bloomberg export<br>`+
+    `<code>data/fnd.csv</code> — FND dates (optional, improves roll accuracy)<br><br>`+
+    `Enable GitHub Pages: Settings → Pages → Branch: main → / (root)`;
 }
 </script>
 </body>
