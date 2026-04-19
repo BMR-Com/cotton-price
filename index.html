@@ -227,6 +227,7 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 .cs-group-hdr td{background:var(--bg3)!important;font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;padding:4px 12px;border-top:1px solid var(--border)}
 
 </style>
+<base target="_blank">
 </head>
 <body>
 <header>
@@ -293,75 +294,6 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
     </div>
   </div>
   <!-- TECHNICAL ANALYSIS -->
-  <div id="panel-ta" class="panel" data-rendered="false">
-    <div class="ta-subtabs">
-      <div class="ta-subtab active" onclick="showTASub('chart',this)">📊 Chart</div>
-      <div class="ta-subtab" onclick="showTASub('opinion',this)">💡 Opinion</div>
-      <div class="ta-subtab" onclick="showTASub('cheatsheet',this)">📋 Cheat Sheet</div>
-    </div>
-    <!-- Shared controls -->
-    <div class="ta-controls">
-      <div class="ta-row">
-        <div class="ta-grp"><div class="ta-lbl">Contract</div>
-          <select class="ta-sel" id="ta-contract" onchange="renderTA()">
-            <option value="continuous">Continuous Series</option>
-          </select></div>
-        <div class="ta-grp"><div class="ta-lbl">Period</div>
-          <select class="ta-sel" id="ta-period" onchange="renderTA()">
-            <option value="daily">Daily</option><option value="weekly">Weekly</option>
-          </select></div>
-        <div class="ta-grp"><div class="ta-lbl">Range</div>
-          <select class="ta-sel" id="ta-range" onchange="renderTA()">
-            <option value="1">1 Year</option><option value="2">2 Years</option>
-            <option value="3">3 Years</option><option value="5" selected>5 Years</option>
-            <option value="10">10 Years</option><option value="999">All Data</option>
-          </select></div>
-        <div class="ta-grp"><div class="ta-lbl">Chart Type</div>
-          <select class="ta-sel" id="ta-ctype" onchange="renderTA()">
-            <option value="candle">Candlestick</option><option value="line">Line</option>
-          </select></div>
-        <div class="ta-sep"></div>
-        <div class="ta-grp"><div class="ta-lbl">Price Overlays</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            <div class="ta-tog on" data-k="sma20"  style="color:#1565c0;border-color:#1565c0" onclick="togTA(this)">SMA 20</div>
-            <div class="ta-tog on" data-k="sma50"  style="color:#e65c00;border-color:#e65c00" onclick="togTA(this)">SMA 50</div>
-            <div class="ta-tog on" data-k="sma200" style="color:#6a1fa0;border-color:#6a1fa0" onclick="togTA(this)">SMA 200</div>
-            <div class="ta-tog"   data-k="ema20"   style="color:#007c91" onclick="togTA(this)">EMA 20</div>
-            <div class="ta-tog"   data-k="ema50"   style="color:#256428" onclick="togTA(this)">EMA 50</div>
-            <div class="ta-tog on" data-k="bb"     style="color:#880e4f;border-color:#880e4f" onclick="togTA(this)">Bollinger</div>
-            <div class="ta-tog"   data-k="fib"     style="color:#4e342e" onclick="togTA(this)">Fibonacci</div>
-            <div class="ta-tog"   data-k="pivot"   style="color:#37474f" onclick="togTA(this)">Pivots</div>
-          </div></div>
-      </div>
-      <div class="ta-row">
-        <div class="ta-grp"><div class="ta-lbl">Oscillators</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            <div class="ta-tog on"  data-k="vol"   style="color:#3d5568;border-color:#3d5568" onclick="togTA(this)">Volume</div>
-            <div class="ta-tog on"  data-k="rsi"   style="color:#c62828;border-color:#c62828" onclick="togTA(this)">RSI 14</div>
-            <div class="ta-tog"     data-k="stoch" style="color:#1455a8" onclick="togTA(this)">Stochastic</div>
-            <div class="ta-tog on"  data-k="macd"  style="color:#1455a8;border-color:#1455a8" onclick="togTA(this)">MACD</div>
-            <div class="ta-tog"     data-k="adx"   style="color:#880e4f" onclick="togTA(this)">ADX/DMI</div>
-            <div class="ta-tog"     data-k="cci"   style="color:#256428" onclick="togTA(this)">CCI 20</div>
-            <div class="ta-tog"     data-k="atr"   style="color:#e65c00" onclick="togTA(this)">ATR 14</div>
-            <div class="ta-tog"     data-k="willr" style="color:#6a1fa0" onclick="togTA(this)">Williams %R</div>
-          </div></div>
-        <div class="ta-sep"></div>
-        <div class="ta-grp"><div class="ta-lbl">Patterns (Chart)</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            <div class="ta-tog on" data-k="sr"      style="color:#3d5568;border-color:#3d5568" onclick="togTA(this)">S/R Levels</div>
-            <div class="ta-tog on" data-k="trendl"  style="color:#1455a8;border-color:#1455a8" onclick="togTA(this)">Trend Lines</div>
-            <div class="ta-tog on" data-k="cpatt"   style="color:#8b5e10;border-color:#8b5e10" onclick="togTA(this)">Candle Patterns</div>
-            <div class="ta-tog"    data-k="draw-line" style="color:#37474f" onclick="setDrawMode('drawline',this)">✏ Draw Line</div>
-            <div class="ta-tog"    data-k="draw-rect" style="color:#37474f" onclick="setDrawMode('drawrect',this)">▭ Draw Box</div>
-            <div class="ta-tog"    data-k="erase"   style="color:#c62828" onclick="setDrawMode('eraseshape',this)">✕ Erase</div>
-            <div class="ta-tog"    data-k="zoom"    style="color:#37474f" onclick="setDrawMode('zoom',this)">🔍 Zoom</div>
-          </div></div>
-      </div>
-    </div>
-    <!-- Chart sub-panel -->
-    <div id="ta-chart-panel">
-      <div class="ta-chart-wrap">
-  <!-- TA Panel -->
   <div id="panel-ta" class="panel" data-rendered="false">
     <div class="ta-subtabs">
       <div class="ta-stab active" onclick="showTATab('chart',this)">📈 Chart</div>
@@ -478,9 +410,7 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
         <tbody id="cs-tbody"></tbody>
       </table></div>
     </div>
-  </div>
-</div>
-<script>
+  </div><script>
 // ═══════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════
