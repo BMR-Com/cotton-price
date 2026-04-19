@@ -11,7 +11,7 @@
 @media print{@page{size:A4 landscape;margin:10mm 8mm}body *{visibility:hidden!important}#print-region,#print-region *{visibility:visible!important}#print-region{position:absolute;left:0;top:0;width:100%}.pct-tbl{font-size:8px!important}.pct-tbl th,.pct-tbl td{padding:2px 4px!important}.bar-track{height:6px!important}.bar-cv,.bar-pct{font-size:8px!important}.bar-hdr{font-size:7px!important}.bar-n{display:none!important}.pct-inputs{display:none!important}.print-header{display:block!important}header,.tabs,.year-bar,.no-print{display:none!important}}
 :root{--bg0:#f0f4f7;--bg1:#ffffff;--bg2:#e8edf2;--bg3:#dde4eb;--border:#c5d0da;--accent:#8b5e10;--blue:#1455a8;--green:#256428;--txt:#18252f;--txt2:#3d5568;--txt3:#7a90a0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg0);color:var(--txt);font-family:'IBM Plex Mono',monospace;min-height:100vh;font-size:14px}
+body{background:var(--bg0);color:var(--txt);font-family:'IBM Plex Mono',monospace;min-height:100vh;font-size:15px}
 header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 26px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.07)}
 .logo{display:flex;align-items:center;gap:12px}
 .logo-title{font-size:18px;font-weight:700;letter-spacing:3px;color:var(--accent)}
@@ -29,9 +29,9 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 #dashboard{display:none}
 .tabs{background:var(--bg1);border-bottom:1px solid var(--border);padding:0 22px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.04)}
 .tabs-left{display:flex;flex-wrap:wrap}
-.tab{font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:12px 15px;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .15s}
+.tab{font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:14px 18px;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .15s}
 .tab:hover{color:var(--txt2)}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
 .data-src{font-size:11px;color:var(--txt3)}
 .year-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:9px 22px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .yb-lbl{font-size:12px;letter-spacing:1px;color:var(--txt3);text-transform:uppercase;font-weight:600;white-space:nowrap}
@@ -102,7 +102,7 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 .ta-row:last-child{margin-bottom:0}
 .ta-grp{display:flex;flex-direction:column;gap:3px}
 .ta-lbl{font-size:10px;color:var(--txt3);letter-spacing:1.5px;font-weight:600;text-transform:uppercase}
-.ta-sel{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg1);color:var(--txt);outline:none}
+.ta-sel{font-family:'IBM Plex Mono',monospace;font-size:14px;padding:6px 10px;border:1px solid var(--border);border-radius:3px;background:var(--bg1);color:var(--txt);outline:none}
 .ta-sel:focus{border-color:var(--blue)}
 .ta-tog{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg1);font-family:'IBM Plex Mono',monospace;transition:all .12s;user-select:none;letter-spacing:.5px;color:var(--txt3)}
 .ta-tog.on{font-weight:700;background:#f0f7ff}
@@ -169,22 +169,22 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 
 /* ── TA TAB STYLES ── */
 .ta-subtabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 6px;margin:-14px -20px 14px}
-.ta-stab{font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:10px 16px;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .15s}
+.ta-stab{font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:12px 20px;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .15s}
 .ta-stab:hover{color:var(--txt2)}.ta-stab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
 .ta-subpanel{display:none}.ta-subpanel.active{display:block}
 .ta-ctrl-bar{background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:14px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
 .ta-ctrl-grp{display:flex;flex-direction:column;gap:4px}
-.ta-ctrl-lbl{font-size:10px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;font-weight:600}
-.ta-sel{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:3px;background:var(--bg1);color:var(--txt);outline:none}
+.ta-ctrl-lbl{font-size:12px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;font-weight:600}
+.ta-sel{font-family:'IBM Plex Mono',monospace;font-size:14px;padding:6px 10px;border:1px solid var(--border);border-radius:3px;background:var(--bg1);color:var(--txt);outline:none}
 .ta-sel:focus{border-color:var(--accent)}
 .ta-tog-row{display:flex;flex-wrap:wrap;gap:5px}
-.ta-tog{font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg1);color:var(--txt3);font-family:'IBM Plex Mono',monospace;transition:all .12s;user-select:none}
+.ta-tog{font-size:13px;padding:4px 10px;border:1px solid var(--border);border-radius:3px;cursor:pointer;background:var(--bg1);color:var(--txt3);font-family:'IBM Plex Mono',monospace;transition:all .12s;user-select:none}
 .ta-tog.on{font-weight:700;background:#eef4ff}
-.ta-chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
+.ta-chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .osc-panel{border-top:1px solid var(--border)}.osc-title{font-size:10px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;padding:4px 12px;background:var(--bg2);font-weight:600}
 .osc-div{width:100%;height:140px}
 .pattern-alerts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.pat-card{border-radius:4px;padding:6px 10px;border:1px solid;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer;transition:opacity .15s}
+.pat-card{border-radius:4px;padding:8px 12px;border:1px solid;font-size:14px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:opacity .15s}
 .pat-card.bull{background:#f1f8f1;border-color:#a5d6a7;color:#1b5e20}
 .pat-card.bear{background:#fff3f3;border-color:#ef9a9a;color:#b71c1c}
 .pat-card.neut{background:#fff8e1;border-color:#ffe082;color:#e65100}
@@ -229,14 +229,14 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 
 /* Enhanced TA Styles */
 .osc-signal{font-size:10px;font-weight:700;padding:1px 6px;border-radius:2px;margin-left:6px;letter-spacing:.5px;text-transform:uppercase}
-.pat-conf{font-size:9px;font-weight:600;margin-left:4px;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,.08)}
+.pat-conf{font-size:11px;font-weight:600;margin-left:6px;padding:2px 6px;border-radius:3px;background:rgba(0,0,0,.08)}
 .pat-card.bull .pat-conf{color:#1b5e20}
 .pat-card.bear .pat-conf{color:#b71c1c}
 .pat-card.neut .pat-conf{color:#e65100}
 
 /* Pattern alerts bar */
 .pattern-alerts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
-.pat-card{border-radius:4px;padding:6px 10px;border:1px solid;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer;transition:opacity .15s}
+.pat-card{border-radius:4px;padding:8px 12px;border:1px solid;font-size:14px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:opacity .15s}
 .pat-card.bull{background:#f1f8f1;border-color:#a5d6a7;color:#1b5e20}
 .pat-card.bear{background:#fff3f3;border-color:#ef9a9a;color:#b71c1c}
 .pat-card.neut{background:#fff8e1;border-color:#ffe082;color:#e65100}
@@ -245,16 +245,16 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 
 /* Oscillator panels */
 .osc-panel{border-top:1px solid var(--border)}
-.osc-title{font-size:10px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;padding:4px 12px;background:var(--bg2);font-weight:600;display:flex;align-items:center}
+.osc-title{font-size:13px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;padding:6px 14px;background:var(--bg2);font-weight:600;display:flex;align-items:center}
 .osc-div{width:100%;height:140px}
 
 /* Enhanced chart container */
-.ta-chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
+.ta-chart-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 
 /* TA Control bar enhancements */
 .ta-ctrl-bar{background:var(--bg1);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:14px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
 .ta-ctrl-grp{display:flex;flex-direction:column;gap:4px}
-.ta-ctrl-lbl{font-size:10px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;font-weight:600}
+.ta-ctrl-lbl{font-size:12px;letter-spacing:1.5px;color:var(--txt3);text-transform:uppercase;font-weight:600}
 .ta-tog-row{display:flex;flex-wrap:wrap;gap:5px}
 </style>
 <base target="_blank">
@@ -419,7 +419,7 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
     </div>
     <div class="pattern-alerts" id="ta-pattern-alerts"></div>
     <div class="ta-chart-wrap">
-      <div id="ta-main-ch" style="width:100%;height:520px"></div>
+      <div id="ta-main-ch" style="width:100%;height:72vh;min-height:600px;max-height:900px"></div>
     </div>
     <div id="osc-rsi" class="osc-panel" style="display:none">
       <div class="osc-title">RSI (14) <span class="osc-signal" id="rsi-signal"></span></div>
@@ -501,11 +501,12 @@ let ANN={},ANN_CHG={},ANN_FLAT={};
 let FND_EXCL=new Set();
 let META={},ACTIVE_YEARS=[];
 let TA_SHOW={sma20:true,sma50:true,sma200:true,sma5:false,sma100:false,
-  ema20:false,ema50:false,bb:true,fib:false,psar:false,
-  rsi:true,macd:true,stoch:false,wr:false,cci:false,atr:false,adx:false,
-  'candle-pat':true,'chart-pat':true};
+  ema20:false,ema50:false,bb:true,fib:false,psar:false,vwap:false,ichimoku:false,
+  rsi:true,macd:true,stoch:false,wr:false,cci:false,atr:false,adx:false,mfi:false,obv:false,
+  'candle-pat':true,'chart-pat':true,sr:false,trendl:false};
 let TA_USER_SHAPES=[];
 let _detectedChartPats=[];
+let _candlePatterns=[];
 
 // ═══════════════════════════════════════════════════════════════════════
 // FND
@@ -710,135 +711,6 @@ function calcWR(high,low,close,p=14){return close.map((_,i)=>{if(i<p-1)return nu
 function calcCCI(high,low,close,p=14){return close.map((_,i)=>{if(i<p-1)return null;const tp=high.slice(i-p+1,i+1).map((h,j)=>(h+low[i-p+1+j]+close[i-p+1+j])/3);const m=tp.reduce((a,b)=>a+b,0)/p,md=tp.reduce((a,b)=>a+Math.abs(b-m),0)/p;return md===0?0:(tp[tp.length-1]-m)/(0.015*md);});}
 function calcPSAR(high,low,close,af=0.02,maxAF=0.2){const sar=[];let rising=true,ep=low[0],curAF=af,curSAR=high[0];for(let i=0;i<close.length;i++){if(i===0){sar.push(curSAR);continue;}if(rising){curSAR=Math.min(curSAR+curAF*(ep-curSAR),low[i-1],i>1?low[i-2]:low[i-1]);if(low[i]<curSAR){rising=false;curSAR=ep;ep=low[i];curAF=af;}else{if(high[i]>ep){ep=high[i];curAF=Math.min(curAF+af,maxAF);}}}else{curSAR=Math.max(curSAR+curAF*(ep-curSAR),high[i-1],i>1?high[i-2]:high[i-1]);if(high[i]>curSAR){rising=true;curSAR=ep;ep=high[i];curAF=af;}else{if(low[i]<ep){ep=low[i];curAF=Math.min(curAF+af,maxAF);}}}sar.push(curSAR);}return sar;}
 
-// VWAP calculation
-function calcVWAP(high, low, close, volume) {
-  const vwap = [];
-  let cumTPV = 0, cumVol = 0;
-  for (let i = 0; i < close.length; i++) {
-    const tp = (high[i] + low[i] + close[i]) / 3;
-    const vol = volume[i] || 0;
-    cumTPV += tp * vol;
-    cumVol += vol;
-    vwap.push(cumVol > 0 ? cumTPV / cumVol : close[i]);
-  }
-  return vwap;
-}
-
-// Ichimoku Cloud calculation
-function calcIchimoku(high, low, close) {
-  const tenkan = [], kijun = [], senkouA = [], senkouB = [], chikou = [];
-  for (let i = 0; i < close.length; i++) {
-    // Tenkan-sen (9-period high/low avg)
-    if (i < 8) { tenkan.push(null); }
-    else {
-      const hh9 = Math.max(...high.slice(i-8, i+1));
-      const ll9 = Math.min(...low.slice(i-8, i+1));
-      tenkan.push((hh9 + ll9) / 2);
-    }
-    // Kijun-sen (26-period high/low avg)
-    if (i < 25) { kijun.push(null); }
-    else {
-      const hh26 = Math.max(...high.slice(i-25, i+1));
-      const ll26 = Math.min(...low.slice(i-25, i+1));
-      kijun.push((hh26 + ll26) / 2);
-    }
-    // Senkou Span A (Tenkan + Kijun)/2 shifted forward 26 periods
-    senkouA.push((tenkan[i] + kijun[i]) / 2);
-    // Senkou Span B (52-period high/low avg) shifted forward 26 periods
-    if (i < 51) { senkouB.push(null); }
-    else {
-      const hh52 = Math.max(...high.slice(i-51, i+1));
-      const ll52 = Math.min(...low.slice(i-51, i+1));
-      senkouB.push((hh52 + ll52) / 2);
-    }
-    // Chikou Span (close shifted back 26 periods)
-    chikou.push(close[i]);
-  }
-  return { tenkan, kijun, senkouA, senkouB, chikou };
-}
-
-// MFI calculation
-function calcMFI(high, low, close, volume, p=14) {
-  const mfi = new Array(p).fill(null);
-  const tp = close.map((c, i) => (high[i] + low[i] + c) / 3);
-  let posMF = 0, negMF = 0;
-  for (let i = 1; i <= p; i++) {
-    const rawMF = tp[i] * (volume[i] || 0);
-    if (tp[i] > tp[i-1]) posMF += rawMF;
-    else negMF += rawMF;
-  }
-  const firstMR = posMF / negMF;
-  mfi.push(100 - 100 / (1 + firstMR));
-  for (let i = p + 1; i < close.length; i++) {
-    const rawMF = tp[i] * (volume[i] || 0);
-    if (tp[i] > tp[i-1]) { posMF += rawMF; }
-    else { negMF += rawMF; }
-    const rawMFOut = tp[i-p] * (volume[i-p] || 0);
-    if (tp[i-p] > tp[i-p-1]) { posMF -= rawMFOut; }
-    else { negMF -= rawMFOut; }
-    const mr = posMF / negMF;
-    mfi.push(100 - 100 / (1 + mr));
-  }
-  return mfi;
-}
-
-// OBV calculation
-function calcOBV(close, volume) {
-  const obv = [0];
-  for (let i = 1; i < close.length; i++) {
-    if (close[i] > close[i-1]) obv.push(obv[obv.length-1] + (volume[i] || 0));
-    else if (close[i] < close[i-1]) obv.push(obv[obv.length-1] - (volume[i] || 0));
-    else obv.push(obv[obv.length-1]);
-  }
-  return obv;
-}
-
-// Support/Resistance levels
-function calcSRLevels(ohlcv) {
-  const levels = [];
-  const window = 20;
-  for (let i = window; i < ohlcv.length - window; i++) {
-    const slice = ohlcv.slice(i - window, i + window + 1);
-    const isHigh = ohlcv[i].h === Math.max(...slice.map(p => p.h));
-    const isLow = ohlcv[i].l === Math.min(...slice.map(p => p.l));
-    if (isHigh) levels.push({ price: ohlcv[i].h, type: 'resistance', date: ohlcv[i].date });
-    if (isLow) levels.push({ price: ohlcv[i].l, type: 'support', date: ohlcv[i].date });
-  }
-  // Cluster nearby levels
-  const clustered = [];
-  for (const level of levels) {
-    const existing = clustered.find(l => Math.abs(l.price - level.price) / level.price < 0.005);
-    if (!existing) clustered.push({...level, touches: 1});
-    else existing.touches++;
-  }
-  return clustered.filter(l => l.touches >= 2).slice(-8);
-}
-
-// Trend lines
-function calcTrendLines(ohlcv) {
-  const lines = [];
-  const swings = [];
-  for (let i = 5; i < ohlcv.length - 5; i++) {
-    const slice = ohlcv.slice(i-5, i+6);
-    if (ohlcv[i].l === Math.min(...slice.map(p => p.l))) swings.push({i, price: ohlcv[i].l, type: 'low'});
-    if (ohlcv[i].h === Math.max(...slice.map(p => p.h))) swings.push({i, price: ohlcv[i].h, type: 'high'});
-  }
-  // Find trend lines from recent swings
-  const recent = swings.slice(-6);
-  for (let i = 0; i < recent.length - 1; i++) {
-    for (let j = i + 1; j < recent.length; j++) {
-      const slope = (recent[j].price - recent[i].price) / (recent[j].i - recent[i].i);
-      if (Math.abs(slope) < 0.001) continue;
-      lines.push({
-        slope: slope,
-        intercept: recent[i].price - slope * recent[i].i,
-        color: recent[j].price > recent[i].price ? '#2e7d32' : '#c62828'
-      });
-    }
-  }
-  return lines.slice(0, 3);
-}
-
 // ═══════════════════════════════════════════════════════════════════════
 // CANDLESTICK PATTERN DETECTION (18 patterns)
 // ═══════════════════════════════════════════════════════════════════════
@@ -849,26 +721,24 @@ function detectCandlePatterns(ohlcv){
     const[o,h,l,c]=[p0.o,p0.h,p0.l,p0.c];
     const body=Math.abs(c-o),rng=(h-l)||0.001,bull=c>o,bear=c<o;
     const upSh=h-Math.max(o,c),dnSh=Math.min(o,c)-l;
-    let conf = 0.7; // base confidence
-    
-    if(body<0.05*rng){pats.push({i,name:'Doji',type:'neut',emoji:'⊙',conf});}
-    else if(dnSh>=2*body&&upSh<=0.3*body&&bull){pats.push({i,name:'Hammer',type:'bull',emoji:'🔨',conf:0.85});}
-    else if(dnSh>=2*body&&upSh<=0.3*body&&bear){pats.push({i,name:'Hanging Man',type:'bear',emoji:'🪝',conf:0.8});}
-    else if(upSh>=2*body&&dnSh<=0.3*body&&bear){pats.push({i,name:'Shooting Star',type:'bear',emoji:'💫',conf:0.85});}
-    else if(upSh>=2*body&&dnSh<=0.3*body&&bull){pats.push({i,name:'Inverted Hammer',type:'bull',emoji:'🔼',conf:0.8});}
-    else if(body<0.3*rng&&upSh>0.2*rng&&dnSh>0.2*rng){pats.push({i,name:'Spinning Top',type:'neut',emoji:'🌀',conf});}
-    if(p1.c<p1.o&&bull&&o<=p1.c&&c>=p1.o){pats.push({i,name:'Bullish Engulfing',type:'bull',emoji:'⬆',conf:0.9});}
-    if(p1.c>p1.o&&bear&&o>=p1.c&&c<=p1.o){pats.push({i,name:'Bearish Engulfing',type:'bear',emoji:'⬇',conf:0.9});}
-    if(p1.c<p1.o&&bull&&o>p1.c&&c<p1.o){pats.push({i,name:'Bullish Harami',type:'bull',emoji:'🤰',conf:0.75});}
-    if(p1.c>p1.o&&bear&&o<p1.c&&c>p1.o){pats.push({i,name:'Bearish Harami',type:'bear',emoji:'🤰',conf:0.75});}
-    if(p1.c<p1.o&&bull&&o<p1.l&&c>(p1.o+p1.c)/2){pats.push({i,name:'Piercing Line',type:'bull',emoji:'💉',conf:0.85});}
-    if(p1.c>p1.o&&bear&&o>p1.h&&c<(p1.o+p1.c)/2){pats.push({i,name:'Dark Cloud Cover',type:'bear',emoji:'☁',conf:0.85});}
-    if(p2.c<p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bull&&c>(p2.o+p2.c)/2){pats.push({i,name:'Morning Star',type:'bull',emoji:'🌅',conf:0.9});}
-    if(p2.c>p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bear&&c<(p2.o+p2.c)/2){pats.push({i,name:'Evening Star',type:'bear',emoji:'🌆',conf:0.9});}
-    if(p2.c>p2.o&&p1.c>p1.o&&bull&&p1.o>p2.o&&o>p1.o){pats.push({i,name:'Three White Soldiers',type:'bull',emoji:'⚔',conf:0.95});}
-    if(p2.c<p2.o&&p1.c<p1.o&&bear&&p1.o<p2.o&&o<p1.o){pats.push({i,name:'Three Black Crows',type:'bear',emoji:'🦅',conf:0.95});}
-    if(Math.abs(h-p1.h)/((h+p1.h)/2)<0.002&&p1.c>p1.o&&bear){pats.push({i,name:'Tweezer Top',type:'bear',emoji:'🔝',conf:0.8});}
-    if(Math.abs(l-p1.l)/((l+p1.l)/2)<0.002&&p1.c<p1.o&&bull){pats.push({i,name:'Tweezer Bottom',type:'bull',emoji:'🔰',conf:0.8});}
+    if(body<0.05*rng)pats.push({i,name:'Doji',type:'neut',emoji:'⊙'});
+    else if(dnSh>=2*body&&upSh<=0.3*body&&bull)pats.push({i,name:'Hammer',type:'bull',emoji:'🔨'});
+    else if(dnSh>=2*body&&upSh<=0.3*body&&bear)pats.push({i,name:'Hanging Man',type:'bear',emoji:'🪝'});
+    else if(upSh>=2*body&&dnSh<=0.3*body&&bear)pats.push({i,name:'Shooting Star',type:'bear',emoji:'💫'});
+    else if(upSh>=2*body&&dnSh<=0.3*body&&bull)pats.push({i,name:'Inverted Hammer',type:'bull',emoji:'🔼'});
+    else if(body<0.3*rng&&upSh>0.2*rng&&dnSh>0.2*rng)pats.push({i,name:'Spinning Top',type:'neut',emoji:'🌀'});
+    if(p1.c<p1.o&&bull&&o<=p1.c&&c>=p1.o)pats.push({i,name:'Bullish Engulfing',type:'bull',emoji:'⬆'});
+    if(p1.c>p1.o&&bear&&o>=p1.c&&c<=p1.o)pats.push({i,name:'Bearish Engulfing',type:'bear',emoji:'⬇'});
+    if(p1.c<p1.o&&bull&&o>p1.c&&c<p1.o)pats.push({i,name:'Bullish Harami',type:'bull',emoji:'🤰'});
+    if(p1.c>p1.o&&bear&&o<p1.c&&c>p1.o)pats.push({i,name:'Bearish Harami',type:'bear',emoji:'🤰'});
+    if(p1.c<p1.o&&bull&&o<p1.l&&c>(p1.o+p1.c)/2)pats.push({i,name:'Piercing Line',type:'bull',emoji:'💉'});
+    if(p1.c>p1.o&&bear&&o>p1.h&&c<(p1.o+p1.c)/2)pats.push({i,name:'Dark Cloud Cover',type:'bear',emoji:'☁'});
+    if(p2.c<p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bull&&c>(p2.o+p2.c)/2)pats.push({i,name:'Morning Star',type:'bull',emoji:'🌅'});
+    if(p2.c>p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bear&&c<(p2.o+p2.c)/2)pats.push({i,name:'Evening Star',type:'bear',emoji:'🌆'});
+    if(p2.c>p2.o&&p1.c>p1.o&&bull&&p1.o>p2.o&&o>p1.o)pats.push({i,name:'Three White Soldiers',type:'bull',emoji:'⚔'});
+    if(p2.c<p2.o&&p1.c<p1.o&&bear&&p1.o<p2.o&&o<p1.o)pats.push({i,name:'Three Black Crows',type:'bear',emoji:'🦅'});
+    if(Math.abs(h-p1.h)/((h+p1.h)/2)<0.002&&p1.c>p1.o&&bear)pats.push({i,name:'Tweezer Top',type:'bear',emoji:'🔝'});
+    if(Math.abs(l-p1.l)/((l+p1.l)/2)<0.002&&p1.c<p1.o&&bull)pats.push({i,name:'Tweezer Bottom',type:'bull',emoji:'🔰'});
   }
   return pats;
 }
@@ -900,19 +770,19 @@ function detectChartPatterns(ohlcv){
     const regH=linReg(sh.slice(-4)),regL=linReg(sl.slice(-4));
     if(regH&&regL){const[mH,mL]=[regH.m,regL.m],tol=0.005;
       const shapes=mkChannel(recent,regH,regL,offset);
-      if(mH>tol&&mL>tol){if(Math.abs(mH-mL)<tol)pats.push({name:'Ascending Channel',type:'bull',desc:'Parallel rising — bullish continuation.',shapes,conf:0.75});
-        else if(mL>mH+tol)pats.push({name:'Ascending Wedge',type:'bear',desc:'Converging upward — bearish reversal.',shapes,conf:0.7});
-        else pats.push({name:'Ascending Triangle',type:'bull',desc:'Rising support, flat resistance — bullish breakout.',shapes,conf:0.75});}
-      else if(mH<-tol&&mL<-tol){if(Math.abs(mH-mL)<tol)pats.push({name:'Descending Channel',type:'bear',desc:'Parallel falling — bearish trend.',shapes,conf:0.75});
-        else if(mH<mL-tol)pats.push({name:'Descending Wedge',type:'bull',desc:'Converging downward — bullish reversal.',shapes,conf:0.7});
-        else pats.push({name:'Descending Triangle',type:'bear',desc:'Falling resistance, flat support — bearish.',shapes,conf:0.75});}
-      else if(Math.abs(mH)<=tol&&Math.abs(mL)<=tol)pats.push({name:'Rectangle / Consolidation',type:'neut',desc:'Price between flat support and resistance.',shapes,conf:0.6});
-      else if(mH<0&&mL>0)pats.push({name:'Symmetrical Triangle',type:'neut',desc:'Converging — watch for breakout with volume.',shapes,conf:0.65});
+      if(mH>tol&&mL>tol){if(Math.abs(mH-mL)<tol)pats.push({name:'Ascending Channel',type:'bull',desc:'Parallel rising — bullish continuation.',shapes});
+        else if(mL>mH+tol)pats.push({name:'Ascending Wedge',type:'bear',desc:'Converging upward — bearish reversal.',shapes});
+        else pats.push({name:'Ascending Triangle',type:'bull',desc:'Rising support, flat resistance — bullish breakout.',shapes});}
+      else if(mH<-tol&&mL<-tol){if(Math.abs(mH-mL)<tol)pats.push({name:'Descending Channel',type:'bear',desc:'Parallel falling — bearish trend.',shapes});
+        else if(mH<mL-tol)pats.push({name:'Descending Wedge',type:'bull',desc:'Converging downward — bullish reversal.',shapes});
+        else pats.push({name:'Descending Triangle',type:'bear',desc:'Falling resistance, flat support — bearish.',shapes});}
+      else if(Math.abs(mH)<=tol&&Math.abs(mL)<=tol)pats.push({name:'Rectangle / Consolidation',type:'neut',desc:'Price between flat support and resistance.',shapes});
+      else if(mH<0&&mL>0)pats.push({name:'Symmetrical Triangle',type:'neut',desc:'Converging — watch for breakout with volume.',shapes});
     }
   }
-  if(sh.length>=2){const[a,b]=sh.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.02)pats.push({name:'Double Top',type:'bear',desc:'Two similar highs — bearish reversal.',shapes:[],conf:0.8});}
-  if(sl.length>=2){const[a,b]=sl.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.02)pats.push({name:'Double Bottom',type:'bull',desc:'Two similar lows — bullish reversal.',shapes:[],conf:0.8});}
-  if(sh.length>=3){const[s1,s2,s3]=sh.slice(-3);if(s2.price>s1.price&&s2.price>s3.price&&Math.abs(s1.price-s3.price)/s1.price<0.03)pats.push({name:'Head & Shoulders',type:'bear',desc:'Classic H&S — major bearish reversal signal.',shapes:[],conf:0.85});}
+  if(sh.length>=2){const[a,b]=sh.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.02)pats.push({name:'Double Top',type:'bear',desc:'Two similar highs — bearish reversal.',shapes:[]});}
+  if(sl.length>=2){const[a,b]=sl.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.02)pats.push({name:'Double Bottom',type:'bull',desc:'Two similar lows — bullish reversal.',shapes:[]});}
+  if(sh.length>=3){const[s1,s2,s3]=sh.slice(-3);if(s2.price>s1.price&&s2.price>s3.price&&Math.abs(s1.price-s3.price)/s1.price<0.03)pats.push({name:'Head & Shoulders',type:'bear',desc:'Classic H&S — major bearish reversal signal.',shapes:[]});}
   return pats;
 }
 
@@ -944,9 +814,16 @@ function renderTAChart(){
   const traces=[];
 
   // Main price trace
-  if(ct==='candle')traces.push({type:'candlestick',x:dates,open:O,high:H,low:L,close:C,name:'Price',increasing:{line:{color:'#2e7d32',width:1},fillcolor:'#e8f5e9'},decreasing:{line:{color:'#c62828',width:1},fillcolor:'#ffebee'},hovertemplate:'Date: %{x|%Y-%m-%d}<br>Open: %{open:.2f}<br>High: %{high:.2f}<br>Low: %{low:.2f}<br>Close: %{close:.2f}<extra></extra>'});
-  else if(ct==='ohlc')traces.push({type:'ohlc',x:dates,open:O,high:H,low:L,close:C,name:'Price',increasing:{line:{color:'#2e7d32'}},decreasing:{line:{color:'#c62828'}}});
-  else traces.push({x:dates,y:C,mode:'lines',name:'Price',line:{color:'#18252f',width:1.5}});
+  if(ct==='candle')traces.push({type:'candlestick',x:dates,open:O,high:H,low:L,close:C,name:'Price',
+    increasing:{line:{color:'#089981',width:2},fillcolor:'#089981',opacity:1},
+    decreasing:{line:{color:'#f23645',width:2},fillcolor:'#f23645',opacity:1},
+    whiskerwidth:0.8,
+    hovertemplate:'<b>%{x|%Y-%m-%d}</b><br>Open: %{open:.3f}<br>High: %{high:.3f}<br>Low: %{low:.3f}<br>Close: %{close:.3f}<extra></extra>'});
+  else if(ct==='ohlc')traces.push({type:'ohlc',x:dates,open:O,high:H,low:L,close:C,name:'Price',
+    increasing:{line:{color:'#089981',width:2}},decreasing:{line:{color:'#f23645',width:2}},
+    hovertemplate:'<b>%{x|%Y-%m-%d}</b><br>Open: %{open:.3f}<br>High: %{high:.3f}<br>Low: %{low:.3f}<br>Close: %{close:.3f}<extra></extra>'});
+  else traces.push({x:dates,y:C,mode:'lines',name:'Price',line:{color:'#2962ff',width:2.5},
+    hovertemplate:'<b>%{x|%Y-%m-%d}</b><br>Price: %{y:.3f}<extra></extra>'});
 
   // Volume bars (subtle)
   if(TA_SHOW.vol!==false){
@@ -1010,17 +887,26 @@ function renderTAChart(){
 
   // Layout
   const layout={
-    xaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:11},rangeslider:{visible:false},type:'date'},
-    yaxis:{title:{text:'Price (¢/lb)',font:{size:13}},color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:11},side:'right',domain:[0.25,1]},
-    yaxis2:{title:{text:'Volume',font:{size:11}},color:'#90a4ae',gridcolor:'#e8edf2',showline:false,tickfont:{size:9},side:'right',overlaying:'y',anchor:'x',domain:[0,0.2],showgrid:false},
-    plot_bgcolor:'#fff',paper_bgcolor:'#fff',font:{color:'#3d5568',family:'IBM Plex Mono',size:11},
-    showlegend:true,legend:{orientation:'h',x:0,y:1.08,font:{size:10},bgcolor:'rgba(255,255,255,.95)'},
-    hovermode:'x unified',margin:{l:10,r:60,t:40,b:40},autosize:true,
+    xaxis:{color:'#3d5568',gridcolor:'rgba(197,208,218,0.3)',showline:true,linecolor:'#c5d0da',tickfont:{size:14},rangeslider:{visible:false},type:'date',
+           showgrid:true,gridwidth:1,zeroline:false,
+           showspikes:true,spikemode:'across',spikesnap:'cursor',spikecolor:'#8b5e10',spikethickness:1,
+           hoverformat:'%Y-%m-%d'},
+    yaxis:{title:{text:'Price (¢/lb)',font:{size:16,color:'#3d5568'}},color:'#3d5568',gridcolor:'rgba(197,208,218,0.3)',showline:true,linecolor:'#c5d0da',tickfont:{size:14},side:'right',domain:[0.22,1],
+           showgrid:true,gridwidth:1,zeroline:false,
+           showspikes:true,spikemode:'across',spikesnap:'cursor',spikecolor:'#8b5e10',spikethickness:1,
+           tickformat:'.2f',hoverformat:'.3f'},
+    yaxis2:{title:{text:'Volume',font:{size:14}},color:'#90a4ae',gridcolor:'#e8edf2',showline:false,tickfont:{size:12},side:'right',overlaying:'y',anchor:'x',domain:[0,0.18],showgrid:false},
+    plot_bgcolor:'#fff',paper_bgcolor:'#fff',font:{color:'#3d5568',family:'IBM Plex Mono',size:14},
+    showlegend:true,legend:{orientation:'h',x:0.02,y:1.12,font:{size:13},bgcolor:'rgba(255,255,255,.98)',bordercolor:'#c5d0da',borderwidth:1},
+    hovermode:'x unified',
+    hoverlabel:{bgcolor:'rgba(255,255,255,0.95)',bordercolor:'#8b5e10',font:{family:'IBM Plex Mono',size:13,color:'#18252f'},borderwidth:2},
+    margin:{l:10,r:70,t:50,b:50},autosize:true,
     shapes:[...cpShapes,...srShapes,...TA_USER_SHAPES],newshape:{line:{color:'#1455a8',width:1.5}},dragmode:'pan',
     annotations:[]
   };
 
-  Plotly.react('ta-main-ch',traces,layout,{responsive:true,displayModeBar:true,modeBarButtonsToAdd:['drawline','drawopenpath','drawrect','eraseshape'],modeBarButtonsToRemove:['autoScale2d']});
+  Plotly.react('ta-main-ch',traces,layout,{responsive:true,displayModeBar:true,displaylogo:false,modeBarButtonsToAdd:['drawline','drawopenpath','drawrect','eraseshape'],modeBarButtonsToRemove:['autoScale2d'],
+    scrollZoom:true,dragmode:'pan',doubleClick:'reset+autosize'});
 
   const el=document.getElementById('ta-main-ch');
   el.removeAllListeners&&el.removeAllListeners('plotly_relayout');
@@ -1043,10 +929,13 @@ function renderOscillators(dates,O,H,L,C,V){
   };
 
   const n=C.length-1;
-  const oscLay={xaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:10},type:'date'},
-    yaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:10},side:'right'},
-    plot_bgcolor:'#fff',paper_bgcolor:'#fafcff',font:{color:'#3d5568',family:'IBM Plex Mono',size:10},
-    showlegend:false,hovermode:'x unified',margin:{l:10,r:60,t:2,b:24},autosize:true};
+  const oscLay={xaxis:{color:'#3d5568',gridcolor:'rgba(197,208,218,0.3)',showline:true,linecolor:'#c5d0da',tickfont:{size:13},type:'date',showgrid:true,gridwidth:1,
+           showspikes:true,spikemode:'vertical',spikesnap:'cursor',spikecolor:'#8b5e10',spikethickness:1},
+    yaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:13},side:'right',showgrid:true,gridwidth:1},
+    plot_bgcolor:'#fff',paper_bgcolor:'#fafcff',font:{color:'#3d5568',family:'IBM Plex Mono',size:13},
+    showlegend:false,hovermode:'x unified',
+    hoverlabel:{bgcolor:'rgba(255,255,255,0.95)',bordercolor:'#8b5e10',font:{family:'IBM Plex Mono',size:12,color:'#18252f'},borderwidth:1},
+    margin:{l:10,r:70,t:8,b:30},autosize:true};
 
   for(const[k,cfg]of Object.entries(oscCfg)){
     const panel=document.getElementById('osc-'+k);
@@ -1068,9 +957,9 @@ function renderOscillators(dates,O,H,L,C,V){
     const lay={...oscLay,shapes:(cfg.hLines||[]).map(y=>({type:'line',x0:dates[0],x1:dates[dates.length-1],y0:y,y1:y,line:{color:'rgba(0,0,0,.15)',width:1,dash:'dot'}})),...(cfg.range?{yaxis:{...oscLay.yaxis,range:cfg.range}}:{})};
 
     if(cfg.multi){
-      if(k==='stoch')Plotly.react(cfg.id,[{x:dates,y:vals.k,mode:'lines',name:'%K',line:{color:'#256428',width:1.5}},{x:dates,y:vals.d,mode:'lines',name:'%D',line:{color:'#e65c00',width:1,dash:'dot'}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false});
-      else if(k==='adx')Plotly.react(cfg.id,[{x:dates,y:vals.adx,mode:'lines',name:'ADX',line:{color:'#4e342e',width:2}},{x:dates,y:vals.pdi,mode:'lines',name:'+DI',line:{color:'#2e7d32',width:1.2}},{x:dates,y:vals.mdi,mode:'lines',name:'-DI',line:{color:'#c62828',width:1.2}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false});
-    }else{Plotly.react(cfg.id,[{x:dates,y:vals,mode:'lines',name:cfg.name,line:{color:cfg.col,width:1.5}}],lay,{responsive:true,displayModeBar:false});}
+      if(k==='stoch')Plotly.react(cfg.id,[{x:dates,y:vals.k,mode:'lines',name:'%K',line:{color:'#256428',width:1.5}},{x:dates,y:vals.d,mode:'lines',name:'%D',line:{color:'#e65c00',width:1,dash:'dot'}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false,scrollZoom:true,dragmode:'pan'});
+      else if(k==='adx')Plotly.react(cfg.id,[{x:dates,y:vals.adx,mode:'lines',name:'ADX',line:{color:'#4e342e',width:2}},{x:dates,y:vals.pdi,mode:'lines',name:'+DI',line:{color:'#2e7d32',width:1.2}},{x:dates,y:vals.mdi,mode:'lines',name:'-DI',line:{color:'#c62828',width:1.2}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false,scrollZoom:true,dragmode:'pan'});
+    }else{Plotly.react(cfg.id,[{x:dates,y:vals,mode:'lines',name:cfg.name,line:{color:cfg.col,width:1.5}}],lay,{responsive:true,displayModeBar:false,scrollZoom:true,dragmode:'pan'});}
   }
 
   // MACD
@@ -1078,7 +967,7 @@ function renderOscillators(dates,O,H,L,C,V){
   if(!TA_SHOW.macd){macdEl.style.display='none';}else{macdEl.style.display='block';const m=calcMACD(C);
     const sigEl=document.getElementById('macd-signal');if(sigEl){const hist=m.hist[n];let sig='NEUTRAL',col='#f9a825';if(hist!==null){if(hist>0){sig='BULLISH';col='#2e7d32';}else{sig='BEARISH';col='#c62828';}}sigEl.textContent=sig;sigEl.style.color=col;}
     Plotly.react('osc-macd-div',[{x:dates,y:m.hist,type:'bar',name:'Hist',marker:{color:m.hist.map(v=>v===null?'transparent':v>=0?'rgba(46,125,50,.6)':'rgba(198,40,40,.6)')}},{x:dates,y:m.line,mode:'lines',name:'MACD',line:{color:'#1455a8',width:1.5}},{x:dates,y:m.sig,mode:'lines',name:'Signal',line:{color:'#e65c00',width:1,dash:'dot'}}],
-    {...oscLay,barmode:'relative',showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}},yaxis:{...oscLay.yaxis,zeroline:true,zerolinecolor:'#c5d0da'}},{responsive:true,displayModeBar:false});
+    {...oscLay,barmode:'relative',showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}},yaxis:{...oscLay.yaxis,zeroline:true,zerolinecolor:'#c5d0da'}},{responsive:true,displayModeBar:false,scrollZoom:true,dragmode:'pan'});
   }
 }
 
@@ -1212,6 +1101,7 @@ function showTATab(id,el){
   if(id==='opinion')renderTAOpinion();if(id==='cheatsheet')renderCheatSheet();
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════
 // PERCENTILE HELPERS
 // ═══════════════════════════════════════════════════════════════════════
@@ -1279,7 +1169,7 @@ function buildPanelDOM(pid){
 }
 const SEA_LAY=(yLbl,zl)=>({xaxis:{title:{text:'Day of Year',font:{size:12,color:'#3d5568'}},color:'#3d5568',gridcolor:'#e8edf2',tickvals:[1,32,60,91,121,152,182,213,244,274,305,335],ticktext:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],range:[1,366],showline:true,linecolor:'#c5d0da',tickfont:{size:11}},yaxis:{title:{text:yLbl,font:{size:12,color:'#3d5568'}},color:'#3d5568',gridcolor:'#e8edf2',zeroline:zl,zerolinecolor:'#8090a0',zerolinewidth:1.5,showline:true,linecolor:'#c5d0da',tickfont:{size:11}},plot_bgcolor:'#fff',paper_bgcolor:'#fff',font:{color:'#3d5568',family:'IBM Plex Mono',size:11},showlegend:true,legend:{x:1.01,y:1,bgcolor:'rgba(255,255,255,.95)',bordercolor:'#c5d0da',borderwidth:1,font:{size:10},title:{text:'Year',font:{color:'#8b5e10',size:11}}},hovermode:'closest',margin:{l:55,r:68,t:8,b:42},autosize:true});
 function mkTraces(dataObj,years){if(!dataObj)return[];const ly=years.at(-1)?.toString();return years.map((yr,i)=>{const ys=yr.toString();if(!dataObj[ys])return null;const{doy,val}=dataObj[ys];return{x:doy,y:val,mode:'lines',name:ys,line:{color:SEA_COLORS[i%SEA_COLORS.length],width:ys===ly?2.8:1.4},opacity:ys===ly?1:0.75,hovertemplate:`<b>${ys}</b> DoY %{x} → %{y:.3f}<extra></extra>`};}).filter(Boolean);}
-function renderChart(id,dataObj,yLbl,zl){const el=document.getElementById(id);if(!el)return;Plotly.react(el,mkTraces(dataObj,ACTIVE_YEARS),SEA_LAY(yLbl,zl),{responsive:true,displayModeBar:false});}
+function renderChart(id,dataObj,yLbl,zl){const el=document.getElementById(id);if(!el)return;Plotly.react(el,mkTraces(dataObj,ACTIVE_YEARS),SEA_LAY(yLbl,zl),{responsive:true,displayModeBar:false,scrollZoom:true,dragmode:'pan'});}
 function renderPanel(pid){buildPanelDOM(pid);const isAbs=pid.includes('abs'),isSea=pid.includes('sea');if(isSea)CONTRACTS.forEach(c=>FIELDS.forEach(f=>{renderChart(`ch-${pid}-${c}-${f}`,isAbs?SEA[c][f]:SEA_PCT[c][f],isAbs?FLD_NICE[f]:f==='HIST_CALL_IMP_VOL'?'Δ pp from Jan 1':'% Δ from Jan 1',!isAbs);}));else{const yL=isAbs?'Spread (¢/lb)':'Δ from Jan 1 (¢)';SPREAD_TYPES.forEach((sType,i)=>{const aType=ANNUAL_TYPES[i];renderChart(`ch-${pid}-cal-${sType}`,isAbs?SPD[sType]:SPD_CHG[sType],yL,!isAbs);renderChart(`ch-${pid}-ann-${aType}`,isAbs?ANN[aType]:ANN_CHG[aType],yL,!isAbs);});}document.getElementById(pid).dataset.rendered='true';}
 function updateAll(){['panel-sea-abs','panel-sea-pct','panel-spd-abs','panel-spd-chg'].forEach(p=>{if(document.getElementById(p).dataset.rendered==='true')renderPanel(p);});}
 
@@ -1296,6 +1186,10 @@ function pDate(s){const p=s.split('/');if(p.length!==3)return null;let[m,d,y]=p.
 function dKey(d){return`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;}
 function dkToDate(k){const[y,m,d]=k.split('-').map(Number);return new Date(y,m,d);}
 function getDOY(d){const u=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());return Math.floor((u-Date.UTC(d.getFullYear(),0,0))/86400000);}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════
 function fmtD(d){return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
 function showErr(msg){document.querySelector('.spinner').style.display='none';document.getElementById('load-msg').style.display='none';document.getElementById('err-box').style.display='block';document.getElementById('err-msg').innerHTML=`<b style="color:#c62828">${msg}</b><br><br>Files required:<br><code>data/cotton_raw.csv</code> — Bloomberg export<br><code>data/fnd.csv</code> — FND dates (rename ProductSpecExpiryDates-4.csv)<br><br>GitHub Pages: Settings → Pages → Branch: main → / (root)`;}
 </script>
