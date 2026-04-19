@@ -234,14 +234,6 @@ header{background:var(--bg1);border-bottom:2px solid var(--border);padding:14px 
 .pat-card.bear .pat-conf{color:#b71c1c}
 .pat-card.neut .pat-conf{color:#e65100}
 
-
-/* Enhanced TA Styles */
-.osc-signal{font-size:10px;font-weight:700;padding:1px 6px;border-radius:2px;margin-left:6px;letter-spacing:.5px;text-transform:uppercase}
-.pat-conf{font-size:9px;font-weight:600;margin-left:4px;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,.08)}
-.pat-card.bull .pat-conf{color:#1b5e20}
-.pat-card.bear .pat-conf{color:#b71c1c}
-.pat-card.neut .pat-conf{color:#e65100}
-
 /* Pattern alerts bar */
 .pattern-alerts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
 .pat-card{border-radius:4px;padding:6px 10px;border:1px solid;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer;transition:opacity .15s}
@@ -537,85 +529,123 @@ function buildFNDExclusionSet(){
       while(cnt<2){d=new Date(d);d.setDate(d.getDate()+dir);
         while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+dir);FND_EXCL.add(dKey(d));cnt++;}}}
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// CORRECTED SPREAD PAIR LOGIC
-// Based on FND transitions to avoid jumps near expiry
-// ═══════════════════════════════════════════════════════════════════════
-
 function getSpreadPair(date,type){
-  const y=date.getFullYear();
   const T=d=>d?d.getTime():-Infinity;
-
-  // Get relevant FNDs for the current and surrounding years
-  const marFND=getFND('mar',y),mayFND=getFND('may',y),julFND=getFND('jul',y),decFND=getFND('dec',y);
-  const marFNDnext=getFND('mar',y+1),mayFNDnext=getFND('may',y+1),julFNDnext=getFND('jul',y+1),decFNDnext=getFND('dec',y+1);
-  const dt=date.getTime();
-
-  if(type==='MAR_MAY'){
-    // Mar/May spread logic:
-    // After May FND until next March FND: Mar1 - May1 (current year May)
-    // After March FND until May FND: Mar1 - May2 (next year May)
-    if(dt>=T(mayFND)&&dt<T(marFNDnext))return{a:'CTMAR1',b:'CTMAY1'};
-    if(dt>=T(marFNDnext)&&dt<T(mayFNDnext))return{a:'CTMAR1',b:'CTMAY2'};
-    // Fallback for dates before May FND in current year
-    if(dt<T(mayFND))return{a:'CTMAR1',b:'CTMAY1'};
-    return{a:'CTMAR1',b:'CTMAY2'};
-  }
-  if(type==='MAY_JUL'){
-    // May/Jul spread logic:
-    // After Jul FND until next May FND: May1 - Jul1
-    // After May FND until Jul FND: May1 - Jul2
-    if(dt>=T(julFND)&&dt<T(mayFNDnext))return{a:'CTMAY1',b:'CTJUL1'};
-    if(dt>=T(mayFNDnext)&&dt<T(julFNDnext))return{a:'CTMAY1',b:'CTJUL2'};
-    if(dt<T(julFND))return{a:'CTMAY1',b:'CTJUL1'};
-    return{a:'CTMAY1',b:'CTJUL2'};
-  }
-  if(type==='JUL_DEC'){
-    // Jul/Dec spread logic:
-    // After Dec FND until next Jul FND: Jul1 - Dec1
-    // After Jul FND until Dec FND: Jul1 - Dec2
-    if(dt>=T(decFND)&&dt<T(julFNDnext))return{a:'CTJUL1',b:'CTDEC1'};
-    if(dt>=T(julFNDnext)&&dt<T(decFNDnext))return{a:'CTJUL1',b:'CTDEC2'};
-    if(dt<T(decFND))return{a:'CTJUL1',b:'CTDEC1'};
-    return{a:'CTJUL1',b:'CTDEC2'};
-  }
-  if(type==='DEC_MAR'){
-    // Dec/Mar spread logic:
-    // After Mar FND until next Dec FND: Dec1 - Mar1 (next year Mar)
-    // After Dec FND until Mar FND: Dec1 - Mar2
-    if(dt>=T(marFND)&&dt<T(decFND))return{a:'CTDEC1',b:'CTMAR1'};
-    if(dt>=T(decFND)&&dt<T(marFNDnext))return{a:'CTDEC1',b:'CTMAR2'};
-    if(dt>=T(marFNDnext))return{a:'CTDEC1',b:'CTMAR1'};
-    return{a:'CTDEC1',b:'CTMAR2'};
-  }
+  const pm=T(prevFND('mar',date)),py=T(prevFND('may',date));
+  const pj=T(prevFND('jul',date)),pd=T(prevFND('dec',date));
+  if(type==='MAR_MAY')return py>pm?{a:'CTMAR1',b:'CTMAY1'}:{a:'CTMAR1',b:'CTMAY2'};
+  if(type==='MAY_JUL')return pj>py?{a:'CTMAY1',b:'CTJUL1'}:{a:'CTMAY1',b:'CTJUL2'};
+  if(type==='JUL_DEC')return pd>pj?{a:'CTJUL1',b:'CTDEC1'}:{a:'CTJUL1',b:'CTDEC2'};
+  if(type==='DEC_MAR')return pm>pd?{a:'CTDEC1',b:'CTMAR1'}:{a:'CTDEC1',b:'CTMAR2'};
 }
-
 function inWindow(date,type){
-  // Window is always active - we just switch contracts based on FND
-  // This avoids gaps by ensuring continuous data
-  return true;
+  const T=d=>d?d.getTime():-Infinity;
+  const pm=T(prevFND('mar',date)),py=T(prevFND('may',date));
+  const pj=T(prevFND('jul',date)),pd=T(prevFND('dec',date));
+  if(type==='MAR_MAY')return py>pm;if(type==='MAY_JUL')return pj>py;
+  if(type==='JUL_DEC')return pd>pj;if(type==='DEC_MAR')return pm>pd;
 }
-
 function getSpreadPair2(type){
-  // Set 2 (deferred) always uses the second year contracts
-  if(type==='MAR_MAY')return{a:'CTMAR2',b:'CTMAY2'};
-  if(type==='MAY_JUL')return{a:'CTMAY2',b:'CTJUL2'};
-  if(type==='JUL_DEC')return{a:'CTJUL2',b:'CTDEC2'};
-  if(type==='DEC_MAR')return{a:'CTDEC2',b:'CTMAR2'};
+  if(type==='MAR_MAY')return{a:'CTMAR2',b:'CTMAY2'};if(type==='MAY_JUL')return{a:'CTMAY2',b:'CTJUL2'};
+  if(type==='JUL_DEC')return{a:'CTJUL2',b:'CTDEC2'};if(type==='DEC_MAR')return{a:'CTDEC2',b:'CTMAR2'};
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════════════
+window.onload=()=>{
+  // FND dates are calculated automatically, no external file needed
+  const dP=fetch('data/cotton_raw.csv').then(r=>{
+    if(!r.ok)throw new Error(`HTTP ${r.status} — data/cotton_raw.csv not found`);return r.text();
+  });
+  setMsg('Fetching data files…');
+  dP.then(csv=>{setMsg('Parsing CSV…');setTimeout(()=>parseMain(csv),40);}).catch(e=>showErr(e.message));
+};
+function setMsg(m){document.getElementById('load-msg').textContent=m;}
+function parseFND(csv){
+  for(const line of csv.trim().split('\n').slice(1)){
+    const p=line.split(',');if(p.length<2)continue;
+    const sym=p[0].trim(),ds=p[1].trim();if(!sym||!ds)continue;
+    const m=sym.match(/^([A-Za-z]+)(\d+)$/);if(!m)continue;
+    const mon=m[1].toLowerCase().substring(0,3),yr=parseInt(m[2])+(parseInt(m[2])<100?2000:0);
+    const dp=ds.split('/').map(Number);if(dp.length<3)continue;
+    UPLOADED_FNDS[mon+yr]=new Date(dp[2],dp[0]-1,dp[1]);
+  }
+}
+function parseMain(csv){
+  const raw=Papa.parse(csv,{header:false,skipEmptyLines:true}).data;
+  const headers=raw[0],colMap={},oColMap={};
+  for(let i=1;i<headers.length;i++){
+    const p=headers[i].trim().split(/\s+/);
+    if(p.length>=3&&CONTRACTS.includes(p[0])){
+      if(FIELDS.includes(p[p.length-1]))colMap[i]={contract:p[0],field:p[p.length-1]};
+      if(OHLCV_FLDS.includes(p[p.length-1]))oColMap[i]={contract:p[0],field:p[p.length-1]};
+    }
+  }
+  for(const c of CONTRACTS){DATA[c]={};DATA_ARR[c]={};OHLCV_DATA[c]={};
+    for(const f of FIELDS)DATA[c][f]=new Map();
+    for(const f of OHLCV_FLDS)OHLCV_DATA[c][f]=new Map();
+  }
+  let n=0;
+  for(let ri=1;ri<raw.length;ri++){
+    const row=raw[ri],date=pDate((row[0]||'').trim());if(!date)continue;
+    const dk=dKey(date);
+    for(const[idx,cf]of Object.entries(colMap)){
+      const rv=(row[idx]||'').trim();if(!rv||rv.includes('N/A'))continue;
+      const v=parseFloat(rv);if(isNaN(v))continue;DATA[cf.contract][cf.field].set(dk,v);n++;
+    }
+    for(const[idx,cf]of Object.entries(oColMap)){
+      const rv=(row[idx]||'').trim();if(!rv||rv.includes('N/A'))continue;
+      const v=parseFloat(rv);if(!isNaN(v))OHLCV_DATA[cf.contract][cf.field].set(dk,v);
+    }
+  }
+  for(const c of CONTRACTS){
+    for(const f of FIELDS){const arr=[];DATA[c][f].forEach((v,dk)=>arr.push({date:dkToDate(dk),value:v}));arr.sort((a,b)=>a.date-b.date);DATA_ARR[c][f]=arr;}
+    const allDks=new Set();OHLCV_FLDS.forEach(f=>OHLCV_DATA[c][f].forEach((_,dk)=>allDks.add(dk)));
+    const oArr=[];
+    for(const dk of allDks){const date=dkToDate(dk);
+      const o=OHLCV_DATA[c].PX_OPEN.get(dk),h=OHLCV_DATA[c].PX_HIGH.get(dk);
+      const l=OHLCV_DATA[c].PX_LOW.get(dk),cl=OHLCV_DATA[c].PX_LAST.get(dk),v=OHLCV_DATA[c].PX_VOLUME.get(dk)||0;
+      if(cl!==undefined)oArr.push({date,o:o||cl,h:h||cl,l:l||cl,c:cl,v});}
+    oArr.sort((a,b)=>a.date-b.date);OHLCV_DATA[c]._arr=oArr;
+  }
+  const dates=DATA_ARR.CTMAR1.PX_LAST.map(p=>p.date);
+  if(!dates.length){showErr('No valid data rows found.');return;}
+  const y0=dates[0].getFullYear(),y1=dates[dates.length-1].getFullYear();
+  META={y0,y1,latest:fmtD(dates[dates.length-1]),n,latestDate:dates[dates.length-1]};
+  setMsg('Computing FND roll dates…');
+  setTimeout(()=>{buildAllFNDs(y0,y1);buildFNDExclusionSet();setMsg('Building seasonality…');
+    setTimeout(()=>{buildSeasonality();setMsg('Computing spreads…');
+      setTimeout(()=>{buildSpreads();buildContSeries();initDash();},40);},40);},40);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SEASONALITY
+// ═══════════════════════════════════════════════════════════════════════
+function buildSeasonality(){
+  SEA={};SEA_PCT={};
+  for(const c of CONTRACTS){SEA[c]={};SEA_PCT[c]={};
+    for(const f of FIELDS){const tmp={};
+      for(const pt of DATA_ARR[c][f]){const yr=pt.date.getFullYear().toString(),doy=getDOY(pt.date);if(!tmp[yr])tmp[yr]={};tmp[yr][doy]=pt.value;}
+      const abs={},pct={};
+      for(const yr in tmp){const e=Object.entries(tmp[yr]).sort((a,b)=>+a[0]-+b[0]);
+        const doys=e.map(x=>+x[0]),vals=e.map(x=>x[1]);abs[yr]={doy:doys,val:vals};
+        const base=vals[0];if(!base||base===0){pct[yr]={doy:doys,val:vals};continue;}
+        pct[yr]={doy:doys,val:f==='HIST_CALL_IMP_VOL'?vals.map(v=>+(v-base).toFixed(3)):vals.map(v=>+((v/base-1)*100).toFixed(3))};}
+      SEA[c][f]=abs;SEA_PCT[c][f]=pct;}}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SPREADS
+// ═══════════════════════════════════════════════════════════════════════
 function buildSpreads(){
   for(const t of SPREAD_TYPES){SPD[t]={};SPD_CHG[t]={};SPD_FLAT[t]=[];SPD2[t]={};SPD2_CHG[t]={};SPD2_FLAT[t]=[];}
   for(const t of ANNUAL_TYPES){ANN[t]={};ANN_CHG[t]={};ANN_FLAT[t]=[];}
   const allDates=DATA_ARR.CTMAR1.PX_LAST.map(p=>p.date);
   for(const sType of SPREAD_TYPES){const tmp1={},tmp2={},cf2=getSpreadPair2(sType);
-    for(const date of allDates){
-      const dk=dKey(date),yr=date.getFullYear().toString(),doy=getDOY(date);
-      // Skip dates near FND to avoid jumps
-      if(FND_EXCL.has(dk))continue;
+    for(const date of allDates){if(!inWindow(date,sType))continue;
+      const dk=dKey(date),yr=date.getFullYear().toString(),doy=getDOY(date);if(FND_EXCL.has(dk))continue;
       const cf1=getSpreadPair(date,sType);
-      if(!cf1||!cf2)continue;
       const va1=DATA[cf1.a].PX_LAST.get(dk),vb1=DATA[cf1.b].PX_LAST.get(dk);
       if(va1!==undefined&&vb1!==undefined){const v=+(va1-vb1).toFixed(3);if(!tmp1[yr])tmp1[yr]={};tmp1[yr][doy]=v;SPD_FLAT[sType].push({date,value:v});}
       const va2=DATA[cf2.a].PX_LAST.get(dk),vb2=DATA[cf2.b].PX_LAST.get(dk);
@@ -630,6 +660,17 @@ function buildSpreads(){
       if(va===undefined||vb===undefined)continue;const v=+(va-vb).toFixed(3);const yr=date.getFullYear().toString(),doy=getDOY(date);if(!tmp[yr])tmp[yr]={};tmp[yr][doy]=v;ANN_FLAT[aType].push({date,value:v});}
     for(const yr in tmp){const e=Object.entries(tmp[yr]).sort((a,b)=>+a[0]-+b[0]);const doys=e.map(x=>+x[0]),vals=e.map(x=>x[1]),base=vals[0];ANN[aType][yr]={doy:doys,val:vals};ANN_CHG[aType][yr]={doy:doys,val:vals.map(v=>+(v-base).toFixed(3))};}
     ANN_FLAT[aType].sort((a,b)=>a.date-b.date);}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTINUOUS SERIES
+// Mar1: Nov13-17 → Feb13-17 | May1: Feb → Apr | Jul1: Apr → Jun | Dec1: Jun → Nov
+// ═══════════════════════════════════════════════════════════════════════
+function switchDate(year,month){for(let d=13;d<=17;d++){const dt=new Date(year,month-1,d);if(dt.getDay()!==0&&dt.getDay()!==6)return dt;}return new Date(year,month-1,13);}
+function getActiveCT(date){
+  const y=date.getFullYear();
+  const novP=switchDate(y-1,11),feb=switchDate(y,2),apr=switchDate(y,4),jun=switchDate(y,6),novC=switchDate(y,11);
+  if(date>=novC)return'CTMAR1';if(date>=jun)return'CTDEC1';if(date>=apr)return'CTJUL1';if(date>=feb)return'CTMAY1';if(date>=novP)return'CTMAR1';return'CTDEC1';
 }
 function buildContSeries(){
   CONT_SERIES=[];CONT_OHLCV=[];
@@ -746,189 +787,6 @@ function detectChartPatterns(ohlcv){
 // ═══════════════════════════════════════════════════════════════════════
 // TA CHART RENDER
 // ═══════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════
-// ENHANCED TECHNICAL ANALYSIS MODULE
-// ═══════════════════════════════════════════════════════════════════════
-
-// ── State ──
-let TA_SHOW={sma20:true,sma50:true,sma200:true,sma5:false,sma100:false,
-  ema20:false,ema50:false,bb:true,fib:false,psar:false,vwap:false,ichimoku:false,
-  rsi:true,macd:true,stoch:false,wr:false,cci:false,atr:false,adx:false,mfi:false,obv:false,
-  'candle-pat':true,'chart-pat':true,sr:false,trendl:false};
-let TA_USER_SHAPES=[];
-let _detectedChartPats=[];
-let _candlePatterns=[];
-
-// ── Enhanced Indicator Calculations ──
-
-function calcSMA(arr,p){return arr.map((_,i)=>{if(i<p-1)return null;let s=0;for(let j=i-p+1;j<=i;j++)s+=arr[j]||0;return s/p;});}
-function calcEMA(arr,p){const k=2/(p+1);let prev=null;return arr.map(v=>{if(v===null||v===undefined)return null;if(prev===null){prev=v;return v;}const r=v*k+prev*(1-k);prev=r;return r;});}
-function calcWMA(arr,p){return arr.map((_,i)=>{if(i<p-1)return null;let num=0,den=0;for(let j=0;j<p;j++){const w=p-j;num+=(arr[i-j]||0)*w;den+=w;}return num/den;});}
-function calcHMA(arr,p){const wma1=calcWMA(arr,p);const wma2=calcWMA(arr,Math.floor(p/2));const diff=wma1.map((v,i)=>(v!==null&&wma2[i]!==null)?2*wma2[i]-v:null);return calcWMA(diff,Math.round(Math.sqrt(p)));}
-
-function calcRSI(arr,p=14){return arr.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=arr[j]-arr[j-1];if(d>0)g+=d;else l-=d;}return l===0?100:100-100/(1+g/l);});}
-function calcMACD(arr){const e12=calcEMA(arr,12),e26=calcEMA(arr,26);const line=e12.map((v,i)=>(v!==null&&e26[i]!==null)?v-e26[i]:null);const valid=line.filter(v=>v!==null);const sigRaw=calcEMA(valid,9);let si=0;const sig=line.map(v=>v!==null?sigRaw[si++]||null:null);return{line,sig,hist:line.map((v,i)=>(v!==null&&sig[i]!==null)?v-sig[i]:null)};}
-function calcBB(arr,p=20,sd=2){return arr.map((_,i)=>{if(i<p-1)return{u:null,m:null,l:null};const sl=arr.slice(i-p+1,i+1);const m=sl.reduce((a,b)=>a+b,0)/p,s=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/p);return{u:m+sd*s,m,l:m-sd*s};});}
-function calcStoch(high,low,close,kp=14,dp=3){const k=close.map((_,i)=>{if(i<kp-1)return null;const hh=Math.max(...high.slice(i-kp+1,i+1)),ll=Math.min(...low.slice(i-kp+1,i+1));return hh===ll?50:(close[i]-ll)/(hh-ll)*100;});const valid=k.filter(v=>v!==null);const dRaw=calcSMA(valid,dp);let si=0;return{k,d:k.map(v=>v!==null?dRaw[si++]||null:null)};}
-function calcATR(high,low,close,p=14){const tr=[null];for(let i=1;i<close.length;i++)tr.push(Math.max(high[i]-low[i],Math.abs(high[i]-close[i-1]),Math.abs(low[i]-close[i-1])));const atr=new Array(p).fill(null);const init=tr.slice(1,p+1).reduce((a,b)=>a+b,0)/p;atr.push(init);for(let i=p+1;i<tr.length;i++)atr.push((atr[atr.length-1]*(p-1)+tr[i])/p);return atr;}
-function calcADX(high,low,close,p=14){const pdm=[0],mdm=[0];for(let i=1;i<close.length;i++){const up=high[i]-high[i-1],dn=low[i-1]-low[i];pdm.push(up>dn&&up>0?up:0);mdm.push(dn>up&&dn>0?dn:0);}function ws(arr,per){const r=new Array(per).fill(null);let s=arr.slice(1,per+1).reduce((a,b)=>a+b,0);r.push(s);for(let i=per+1;i<arr.length;i++){s=s-s/per+arr[i];r.push(s);}return r;}const atrW=ws(calcATR(high,low,close,p).map(v=>v||0),p),pdmW=ws(pdm,p),mdmW=ws(mdm,p);const pdi=pdmW.map((v,i)=>atrW[i]?v/atrW[i]*100:null);const mdi=mdmW.map((v,i)=>atrW[i]?v/atrW[i]*100:null);const dx=pdi.map((v,i)=>(v!==null&&mdi[i]!==null&&(v+mdi[i])>0)?Math.abs(v-mdi[i])/(v+mdi[i])*100:null);const adxRaw=calcSMA(dx.filter(v=>v!==null),p);let ai=0;return{adx:dx.map(v=>v!==null?adxRaw[ai++]||null:null),pdi,mdi};}
-function calcWR(high,low,close,p=14){return close.map((_,i)=>{if(i<p-1)return null;const hh=Math.max(...high.slice(i-p+1,i+1)),ll=Math.min(...low.slice(i-p+1,i+1));return hh===ll?-50:(hh-close[i])/(hh-ll)*-100;});}
-function calcCCI(high,low,close,p=14){return close.map((_,i)=>{if(i<p-1)return null;const tp=high.slice(i-p+1,i+1).map((h,j)=>(h+low[i-p+1+j]+close[i-p+1+j])/3);const m=tp.reduce((a,b)=>a+b,0)/p,md=tp.reduce((a,b)=>a+Math.abs(b-m),0)/p;return md===0?0:(tp[tp.length-1]-m)/(0.015*md);});}
-function calcPSAR(high,low,close,af=0.02,maxAF=0.2){const sar=[];let rising=true,ep=low[0],curAF=af,curSAR=high[0];for(let i=0;i<close.length;i++){if(i===0){sar.push(curSAR);continue;}if(rising){curSAR=Math.min(curSAR+curAF*(ep-curSAR),low[i-1],i>1?low[i-2]:low[i-1]);if(low[i]<curSAR){rising=false;curSAR=ep;ep=low[i];curAF=af;}else{if(high[i]>ep){ep=high[i];curAF=Math.min(curAF+af,maxAF);}}}else{curSAR=Math.max(curSAR+curAF*(ep-curSAR),high[i-1],i>1?high[i-2]:high[i-1]);if(high[i]>curSAR){rising=true;curSAR=ep;ep=high[i];curAF=af;}else{if(low[i]<ep){ep=low[i];curAF=Math.min(curAF+af,maxAF);}}}sar.push(curSAR);}return sar;}
-function calcMFI(high,low,close,volume,p=14){const tp=close.map((c,i)=>(high[i]+low[i]+c)/3);const pmf=[null],nmf=[null];for(let i=1;i<tp.length;i++){const tpv=tp[i]*volume[i],prev=tp[i-1]*volume[i-1];if(tp[i]>tp[i-1]){pmf.push(tpv);nmf.push(0);}else if(tp[i]<tp[i-1]){pmf.push(0);nmf.push(tpv);}else{pmf.push(0);nmf.push(0);}}const mfr=pmf.map((v,i)=>(v+nmf[i])===0?1:v/nmf[i]);return mfr.map((_,i)=>{if(i<p)return null;const spmf=pmf.slice(i-p+1,i+1).reduce((a,b)=>a+b,0);const snmf=nmf.slice(i-p+1,i+1).reduce((a,b)=>a+b,0);return snmf===0?100:100-(100/(1+spmf/snmf));});}
-function calcOBV(close,volume){const obv=[volume[0]||0];for(let i=1;i<close.length;i++){if(close[i]>close[i-1])obv.push(obv[obv.length-1]+(volume[i]||0));else if(close[i]<close[i-1])obv.push(obv[obv.length-1]-(volume[i]||0));else obv.push(obv[obv.length-1]);}return obv;}
-function calcVWAP(high,low,close,volume){const tp=close.map((c,i)=>(high[i]+low[i]+c)/3);const cumPV=[tp[0]*volume[0]],cumV=[volume[0]];for(let i=1;i<tp.length;i++){cumPV.push(cumPV[cumPV.length-1]+tp[i]*volume[i]);cumV.push(cumV[cumV.length-1]+volume[i]);}return cumPV.map((v,i)=>cumV[i]?v/cumV[i]:null);}
-function calcIchimoku(high,low,close){const tenkan=9,kijun=26,senkouB=52;const donchian=(h,l,p,i)=>{if(i<p-1)return null;const hh=Math.max(...h.slice(i-p+1,i+1)),ll=Math.min(...l.slice(i-p+1,i+1));return(hh+ll)/2;};const tenkanSen=high.map((_,i)=>donchian(high,low,tenkan,i));const kijunSen=high.map((_,i)=>donchian(high,low,kijun,i));const senkouA=tenkanSen.map((v,i)=>(v!==null&&kijunSen[i]!==null)?(v+kijunSen[i])/2:null);const senkouB=high.map((_,i)=>donchian(high,low,senkouB,i));const chikou=close.map((v,i)=>i+26<close.length?close[i+26]:null);return{tenkan:tenkanSen,kijun:kijunSen,senkouA,senkouB,chikou};}
-
-// ── Enhanced Candlestick Pattern Detection (25+ patterns) ──
-function detectCandlePatterns(ohlcv){
-  const pats=[],n=ohlcv.length;
-  for(let i=2;i<n;i++){
-    const[p2,p1,p0]=[ohlcv[i-2],ohlcv[i-1],ohlcv[i]];
-    const[o,h,l,c]=[p0.o,p0.h,p0.l,p0.c];
-    const body=Math.abs(c-o),rng=(h-l)||0.001,bull=c>o,bear=c<o;
-    const upSh=h-Math.max(o,c),dnSh=Math.min(o,c)-l;
-    const avgRng=rng;
-
-    // Single candle patterns
-    if(body<0.1*rng&&upSh>0.4*rng&&dnSh>0.4*rng)pats.push({i,name:'Long-Legged Doji',type:'neut',emoji:'⚖',conf:0.6});
-    else if(body<0.05*rng)pats.push({i,name:'Doji',type:'neut',emoji:'⊙',conf:0.5});
-    else if(dnSh>=2*body&&upSh<=0.3*body&&bull)pats.push({i,name:'Hammer',type:'bull',emoji:'🔨',conf:0.7});
-    else if(dnSh>=2*body&&upSh<=0.3*body&&bear)pats.push({i,name:'Hanging Man',type:'bear',emoji:'🪝',conf:0.7});
-    else if(upSh>=2*body&&dnSh<=0.3*body&&bear)pats.push({i,name:'Shooting Star',type:'bear',emoji:'💫',conf:0.75});
-    else if(upSh>=2*body&&dnSh<=0.3*body&&bull)pats.push({i,name:'Inverted Hammer',type:'bull',emoji:'🔼',conf:0.65});
-    else if(body<0.3*rng&&upSh>0.2*rng&&dnSh>0.2*rng)pats.push({i,name:'Spinning Top',type:'neut',emoji:'🌀',conf:0.4});
-    else if(body>0.8*rng&&bull)pats.push({i,name:'Marubozu Bull',type:'bull',emoji:'🟢',conf:0.8});
-    else if(body>0.8*rng&&bear)pats.push({i,name:'Marubozu Bear',type:'bear',emoji:'🔴',conf:0.8});
-
-    // Two candle patterns
-    if(p1.c<p1.o&&bull&&o<=p1.c&&c>=p1.o)pats.push({i,name:'Bullish Engulfing',type:'bull',emoji:'⬆',conf:0.85});
-    if(p1.c>p1.o&&bear&&o>=p1.c&&c<=p1.o)pats.push({i,name:'Bearish Engulfing',type:'bear',emoji:'⬇',conf:0.85});
-    if(p1.c<p1.o&&bull&&o>p1.c&&c<p1.o&&body<Math.abs(p1.c-p1.o))pats.push({i,name:'Bullish Harami',type:'bull',emoji:'🤰',conf:0.7});
-    if(p1.c>p1.o&&bear&&o<p1.c&&c>p1.o&&body<Math.abs(p1.c-p1.o))pats.push({i,name:'Bearish Harami',type:'bear',emoji:'🤰',conf:0.7});
-    if(p1.c<p1.o&&bull&&o<p1.l&&c>(p1.o+p1.c)/2)pats.push({i,name:'Piercing Line',type:'bull',emoji:'💉',conf:0.75});
-    if(p1.c>p1.o&&bear&&o>p1.h&&c<(p1.o+p1.c)/2)pats.push({i,name:'Dark Cloud Cover',type:'bear',emoji:'☁',conf:0.75});
-    if(Math.abs(h-p1.h)/((h+p1.h)/2)<0.002&&p1.c>p1.o&&bear)pats.push({i,name:'Tweezer Top',type:'bear',emoji:'🔝',conf:0.7});
-    if(Math.abs(l-p1.l)/((l+p1.l)/2)<0.002&&p1.c<p1.o&&bull)pats.push({i,name:'Tweezer Bottom',type:'bull',emoji:'🔰',conf:0.7});
-
-    // Three candle patterns
-    if(p2.c<p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bull&&c>(p2.o+p2.c)/2)pats.push({i,name:'Morning Star',type:'bull',emoji:'🌅',conf:0.8});
-    if(p2.c>p2.o&&Math.abs(p1.c-p1.o)<0.3*(p2.h-p2.l)&&bear&&c<(p2.o+p2.c)/2)pats.push({i,name:'Evening Star',type:'bear',emoji:'🌆',conf:0.8});
-    if(p2.c>p2.o&&p1.c>p1.o&&bull&&p1.o>p2.o&&o>p1.o)pats.push({i,name:'Three White Soldiers',type:'bull',emoji:'⚔',conf:0.85});
-    if(p2.c<p2.o&&p1.c<p1.o&&bear&&p1.o<p2.o&&o<p1.o)pats.push({i,name:'Three Black Crows',type:'bear',emoji:'🦅',conf:0.85});
-    if(p2.c<p2.o&&p1.c>p1.o&&bull&&o>p1.c&&c>p1.o&&c>p2.o)pats.push({i,name:'Morning Doji Star',type:'bull',emoji:'🌄',conf:0.8});
-    if(p2.c>p2.o&&p1.c<p1.o&&bear&&o<p1.c&&c<p1.o&&c<p2.o)pats.push({i,name:'Evening Doji Star',type:'bear',emoji:'🌇',conf:0.8});
-
-    // Advanced patterns
-    if(i>=3){const p3=ohlcv[i-3];if(p3.c<p3.o&&p2.c<p2.o&&p1.c<p1.o&&bull&&c>p1.o&&c>p2.o)pats.push({i,name:'Three Inside Up',type:'bull',emoji:'📈',conf:0.75});}
-    if(i>=3){const p3=ohlcv[i-3];if(p3.c>p3.o&&p2.c>p2.o&&p1.c>p1.o&&bear&&c<p1.o&&c<p2.o)pats.push({i,name:'Three Inside Down',type:'bear',emoji:'📉',conf:0.75});}
-  }
-  return pats.sort((a,b)=>b.conf-a.conf);
-}
-
-// ── Advanced Chart Pattern Detection ──
-function findSwings(ohlcv,win=5){
-  const sh=[],sl=[];
-  for(let i=win;i<ohlcv.length-win;i++){
-    const hi=ohlcv[i].h,lo=ohlcv[i].l;
-    if(ohlcv.slice(i-win,i+win+1).every((p,j)=>j===win||p.h<=hi))sh.push({i,price:hi,date:ohlcv[i].date});
-    if(ohlcv.slice(i-win,i+win+1).every((p,j)=>j===win||p.l>=lo))sl.push({i,price:lo,date:ohlcv[i].date});
-  }
-  return{sh,sl};
-}
-function linReg(pts){const n=pts.length;if(n<2)return null;const xs=pts.map(p=>p.i),ys=pts.map(p=>p.price);const sx=xs.reduce((a,b)=>a+b,0),sy=ys.reduce((a,b)=>a+b,0),sxy=xs.reduce((a,b,j)=>a+b*ys[j],0),sx2=xs.reduce((a,b)=>a+b*b,0);const d=n*sx2-sx*sx;if(d===0)return null;const m=(n*sxy-sx*sy)/d,b=(sy-m*sx)/n;return{m,b};}
-function calcVolatility(ohlcv,period=20){const closes=ohlcv.map(p=>p.c);return closes.map((_,i)=>{if(i<period-1)return null;const slice=closes.slice(i-period+1,i+1);const mean=slice.reduce((a,b)=>a+b,0)/period;return Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/period);});}
-
-function detectChartPatterns(ohlcv){
-  if(ohlcv.length<40)return[];
-  const recent=ohlcv.slice(-Math.min(300,ohlcv.length));
-  const offset=ohlcv.length-recent.length;
-  const{sh,sl}=findSwings(recent,5);
-  const pats=[];
-  const vol=calcVolatility(recent);
-  const avgVol=vol.filter(v=>v!==null).reduce((a,b)=>a+b,0)/vol.filter(v=>v!==null).length||1;
-
-  if(sh.length>=3&&sl.length>=3){
-    const regH=linReg(sh.slice(-5)),regL=linReg(sl.slice(-5));
-    if(regH&&regL){
-      const[mH,mL]=[regH.m,regL.m],tol=0.008;
-      const shapes=mkChannel(recent,regH,regL,offset);
-      const curPrice=recent[recent.length-1].c;
-      const channelWidth=Math.abs(regH.m*(recent.length-1+offset)+regH.b-(regL.m*(recent.length-1+offset)+regL.b));
-      const breakout=channelWidth>0?Math.abs(curPrice-(regH.m*(recent.length-1+offset)+regH.b))/channelWidth:0;
-
-      if(mH>tol&&mL>tol){
-        if(Math.abs(mH-mL)<tol)pats.push({name:'Ascending Channel',type:'bull',desc:'Parallel rising support/resistance — bullish continuation.',shapes,conf:0.7,breakout});
-        else if(mL>mH+tol)pats.push({name:'Ascending Wedge',type:'bear',desc:'Converging upward lines — bearish reversal warning.',shapes,conf:0.75,breakout});
-        else pats.push({name:'Ascending Triangle',type:'bull',desc:'Rising support with flat resistance — bullish breakout expected.',shapes,conf:0.8,breakout});
-      }
-      else if(mH<-tol&&mL<-tol){
-        if(Math.abs(mH-mL)<tol)pats.push({name:'Descending Channel',type:'bear',desc:'Parallel falling support/resistance — bearish trend.',shapes,conf:0.7,breakout});
-        else if(mH<mL-tol)pats.push({name:'Descending Wedge',type:'bull',desc:'Converging downward lines — bullish reversal warning.',shapes,conf:0.75,breakout});
-        else pats.push({name:'Descending Triangle',type:'bear',desc:'Falling resistance with flat support — bearish breakdown expected.',shapes,conf:0.8,breakout});
-      }
-      else if(Math.abs(mH)<=tol&&Math.abs(mL)<=tol)pats.push({name:'Rectangle / Range',type:'neut',desc:'Price oscillating between flat support and resistance.',shapes,conf:0.6,breakout});
-      else if(mH<0&&mL>0)pats.push({name:'Symmetrical Triangle',type:'neut',desc:'Converging trendlines — explosive breakout imminent.',shapes,conf:0.85,breakout});
-      else if(mH>0&&mL<0)pats.push({name:'Expanding Triangle',type:'neut',desc:'Diverging trendlines — increasing volatility.',shapes,conf:0.5,breakout});
-    }
-  }
-
-  // Flag/Pennant detection
-  if(sh.length>=4&&sl.length>=4){
-    const last4H=sh.slice(-4),last4L=sl.slice(-4);
-    const poleStart=Math.min(last4H[0].i,last4L[0].i);
-    const poleEnd=Math.max(last4H[1].i,last4L[1].i);
-    const flagStart=Math.min(last4H[2].i,last4L[2].i);
-    const poleHeight=Math.abs(recent[poleEnd].c-recent[poleStart].c);
-    const flagWidth=recent[recent.length-1].c-recent[flagStart].c;
-
-    if(poleHeight>2*avgVol&&Math.abs(flagWidth)<0.5*poleHeight){
-      if(last4H.slice(2).every((h,j)=>j===0||h.price<=last4H[2].price)&&last4L.slice(2).every((l,j)=>j===0||l.price>=last4L[2].price)){
-        pats.push({name:'Bull Flag',type:'bull',desc:'Sharp rally followed by tight consolidation — continuation expected.',shapes:[],conf:0.8,breakout:0});
-      }
-      if(last4H.slice(2).every((h,j)=>j===0||h.price>=last4H[2].price)&&last4L.slice(2).every((l,j)=>j===0||l.price<=last4L[2].price)){
-        pats.push({name:'Bear Flag',type:'bear',desc:'Sharp decline followed by tight consolidation — continuation expected.',shapes:[],conf:0.8,breakout:0});
-      }
-    }
-  }
-
-  // Head and Shoulders
-  if(sh.length>=5){
-    const[s1,s2,s3,s4,s5]=sh.slice(-5);
-    if(s3.price>s2.price&&s3.price>s4.price&&Math.abs(s2.price-s4.price)/s2.price<0.03&&s2.price>s1.price&&s2.price>s5.price){
-      pats.push({name:'Head & Shoulders',type:'bear',desc:'Classic reversal pattern — major top formation.',shapes:[],conf:0.9,breakout:0});
-    }
-    if(s3.price<s2.price&&s3.price<s4.price&&Math.abs(s2.price-s4.price)/s2.price<0.03&&s2.price<s1.price&&s2.price<s5.price){
-      pats.push({name:'Inverse H&S',type:'bull',desc:'Classic reversal pattern — major bottom formation.',shapes:[],conf:0.9,breakout:0});
-    }
-  }
-
-  // Double tops/bottoms
-  if(sh.length>=2){const[a,b]=sh.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.015&&b.i-a.i>10)pats.push({name:'Double Top',type:'bear',desc:'Two similar highs — bearish reversal.',shapes:[],conf:0.75,breakout:0});}
-  if(sl.length>=2){const[a,b]=sl.slice(-2);if(Math.abs(a.price-b.price)/a.price<0.015&&b.i-a.i>10)pats.push({name:'Double Bottom',type:'bull',desc:'Two similar lows — bullish reversal.',shapes:[],conf:0.75,breakout:0});}
-
-  // Cup and Handle
-  if(sl.length>=3){const[a,b,c]=sl.slice(-3);if(b.price<a.price&&b.price<c.price&&Math.abs(a.price-c.price)/a.price<0.05&&c.i-b.i>20)pats.push({name:'Cup & Handle',type:'bull',desc:'Rounded bottom with pullback — bullish continuation.',shapes:[],conf:0.7,breakout:0});}
-
-  return pats.sort((a,b)=>b.conf-a.conf);
-}
-
-function mkChannel(ohlcv,regH,regL,offset){
-  const n=ohlcv.length,x0=ohlcv[0].date,xN=ohlcv[n-1].date;
-  return[
-    {type:'line',x0,y0:regH.m*offset+regH.b,x1:xN,y1:regH.m*(n-1+offset)+regH.b,line:{color:'rgba(198,40,40,0.6)',width:1.5,dash:'dash'},editable:false},
-    {type:'line',x0,y0:regL.m*offset+regL.b,x1:xN,y1:regL.m*(n-1+offset)+regL.b,line:{color:'rgba(46,125,50,0.6)',width:1.5,dash:'dash'},editable:false}
-  ];
-}
-
-// ── Support/Resistance Levels ──
-function calcSRLevels(ohlcv,lookback=50){const recent=ohlcv.slice(-lookback);const highs=recent.map(p=>p.h),lows=recent.map(p=>p.l);const levels=[];const hHist={},lHist={};for(const h of highs){const r=Math.round(h*20)/20;hHist[r]=(hHist[r]||0)+1;}for(const l of lows){const r=Math.round(l*20)/20;lHist[r]=(lHist[r]||0)+1;}for(const[k,v]of Object.entries(hHist)){if(v>=3)levels.push({price:+k,strength:v,type:'resistance'});}for(const[k,v]of Object.entries(lHist)){if(v>=3)levels.push({price:+k,strength:v,type:'support'});}return levels.sort((a,b)=>b.strength-a.strength).slice(0,8);}
-
-// ── Trend Lines ──
-function calcTrendLines(ohlcv){const{sh,sl}=findSwings(ohlcv,3);const lines=[];if(sh.length>=2){const reg=linReg(sh.slice(-3));if(reg&&reg.m!==0)lines.push({type:'trend',slope:reg.m,intercept:reg.b,points:sh.slice(-3),color:'#c62828'});}if(sl.length>=2){const reg=linReg(sl.slice(-3));if(reg&&reg.m!==0)lines.push({type:'trend',slope:reg.m,intercept:reg.b,points:sl.slice(-3),color:'#2e7d32'});}return lines;}
-
-// ── Main Chart Rendering ──
 function togTA(el){const k=el.dataset.k;if(!k)return;TA_SHOW[k]=!TA_SHOW[k];el.classList.toggle('on',TA_SHOW[k]);renderTAChart();}
 function setDrawMode(el,mode){document.querySelectorAll('.ta-tog[data-mode]').forEach(b=>b.classList.remove('on'));el.classList.add('on');Plotly.relayout('ta-main-ch',{dragmode:mode});}
 function clearDrawings(){TA_USER_SHAPES=[];renderTAChart();}
@@ -947,7 +805,6 @@ function getSelectedOHLCV(){
   if(yrs<999){const cut=new Date(META.latestDate);cut.setFullYear(cut.getFullYear()-yrs);raw=raw.filter(p=>p.date>=cut);}
   return tf==='W'?toWeekly(raw):raw;
 }
-
 function renderTAChart(){
   const ohlcv=getSelectedOHLCV();if(!ohlcv.length)return;
   const dates=ohlcv.map(p=>p.date),O=ohlcv.map(p=>p.o),H=ohlcv.map(p=>p.h),L=ohlcv.map(p=>p.l),C=ohlcv.map(p=>p.c),V=ohlcv.map(p=>p.v||0);
@@ -1223,6 +1080,273 @@ function showTATab(id,el){
   if(id==='opinion')renderTAOpinion();if(id==='cheatsheet')renderCheatSheet();
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// PERCENTILE HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+function pctColor(p){if(p===null)return'#7a90a0';if(p<10)return'#c62828';if(p<25)return'#e53935';if(p<40)return'#ef6c00';if(p<60)return'#f9a825';if(p<75)return'#7cb342';if(p<90)return'#43a047';return'#2e7d32';}
+function fmtV(v){if(v===null||v===undefined)return'—';return Math.abs(v)>=10000?v.toLocaleString('en',{maximumFractionDigits:0}):Math.abs(v)>=100?v.toFixed(1):v.toFixed(2);}
+function computePctile(curVal,pts,latestDate,years,excl){if(curVal===null||curVal===undefined||isNaN(curVal))return null;const cutoff=years>=25?null:new Date(latestDate);if(cutoff)cutoff.setFullYear(cutoff.getFullYear()-years);const hist=pts.filter(p=>{if(cutoff&&p.date<cutoff)return false;if(p.date>latestDate)return false;if(excl&&excl.has(dKey(p.date)))return false;return true;}).map(p=>p.value);if(hist.length<10)return null;return{pct:hist.filter(v=>v<curVal).length/hist.length*100,n:hist.length,min:Math.min(...hist),max:Math.max(...hist)};}
+function barCellHTML(curVal,res){if(!res||curVal===null||curVal===undefined)return`<td class="pct-cell"><div class="na-cell">N/A</div></td>`;const{pct,n,min,max}=res,col=pctColor(pct),pv=Math.max(0,Math.min(100,pct));return`<td class="pct-cell"><div class="bar-wrap"><div class="bar-hdr"><span>${fmtV(min)}</span><span class="bar-pct" style="color:${col}">${pct.toFixed(0)}%ile</span><span>${fmtV(max)}</span></div><div class="bar-track"><div class="bar-fill" style="width:${pv.toFixed(1)}%;background:${col}"></div><div class="bar-cur-line" style="left:${pv.toFixed(1)}%"></div></div><div class="bar-cv" style="color:${col}">${fmtV(curVal)}</div><div class="bar-n">n=${n.toLocaleString()}</div></div></td>`;}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PERCENTILE TABLE
+// ═══════════════════════════════════════════════════════════════════════
+function renderPctTable(){
+  const ld=META.latestDate,curPrices={};
+  for(const c of CONTRACTS){const inp=document.getElementById('inp-'+c);const v=inp&&inp.value.trim()?parseFloat(inp.value):null;curPrices[c]=(!isNaN(v)&&v!==null)?v:DATA_ARR[c].PX_LAST?.at(-1)?.value??null;}
+  let html='';
+  html+=`<tr class="section-hdr"><td colspan="5">CONTRACT SEASONALITY</td></tr>`;
+  CONTRACTS.forEach((c,ci)=>{FIELDS.forEach((f,fi)=>{const curVal=f==='PX_LAST'?curPrices[c]:DATA_ARR[c][f]?.at(-1)?.value??null;const pts=DATA_ARR[c][f]||[],bg=ci%2===0?'':'background:#fafbfc';html+=`<tr style="${bg}">`;if(fi===0)html+=`<td class="td-grp" rowspan="${FIELDS.length}">${c}</td>`;html+=`<td class="td-fld">${FLD_NICE[f]}</td>`;html+=barCellHTML(curVal,computePctile(curVal,pts,ld,5,null));html+=barCellHTML(curVal,computePctile(curVal,pts,ld,10,null));html+=barCellHTML(curVal,computePctile(curVal,pts,ld,25,null));html+=`</tr>`;});});
+  const s1n={MAR_MAY:'Mar1–May1',MAY_JUL:'May1–Jul1',JUL_DEC:'Jul1–Dec1',DEC_MAR:'Dec1–Mar1'};
+  html+=`<tr class="section-hdr"><td colspan="5">CALENDAR SPREADS SET 1 — Prompt contracts · Window period only · ±2 biz days near FND excluded</td></tr>`;
+  SPREAD_TYPES.forEach(sType=>{const cf=getSpreadPair(new Date(),sType);const ca=curPrices[cf?.a],cb=curPrices[cf?.b];const curVal=(ca!=null&&cb!=null)?+(ca-cb).toFixed(3):SPD_FLAT[sType]?.at(-1)?.value??null;html+=`<tr><td class="td-grp td-grp-cal">${s1n[sType]}</td><td class="td-fld">Price (¢/lb)</td>`;html+=barCellHTML(curVal,computePctile(curVal,SPD_FLAT[sType],ld,5,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,SPD_FLAT[sType],ld,10,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,SPD_FLAT[sType],ld,25,FND_EXCL));html+=`</tr>`;});
+  const s2n={MAR_MAY:'Mar2–May2',MAY_JUL:'May2–Jul2',JUL_DEC:'Jul2–Dec2',DEC_MAR:'Dec2–Mar2'};
+  html+=`<tr class="section-hdr"><td colspan="5">CALENDAR SPREADS SET 2 — Deferred contracts · Same window · ±2 biz days near FND excluded</td></tr>`;
+  SPREAD_TYPES.forEach(sType=>{const cf2=getSpreadPair2(sType);const ca=curPrices[cf2.a],cb=curPrices[cf2.b];const curVal=(ca!=null&&cb!=null)?+(ca-cb).toFixed(3):SPD2_FLAT[sType]?.at(-1)?.value??null;html+=`<tr><td class="td-grp td-grp-cal">${s2n[sType]}</td><td class="td-fld">Price (¢/lb)</td>`;html+=barCellHTML(curVal,computePctile(curVal,SPD2_FLAT[sType],ld,5,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,SPD2_FLAT[sType],ld,10,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,SPD2_FLAT[sType],ld,25,FND_EXCL));html+=`</tr>`;});
+  html+=`<tr class="section-hdr"><td colspan="5">ANNUAL SPREADS · ±2 biz days near FND excluded</td></tr>`;
+  ANNUAL_TYPES.forEach(aType=>{const c1='CT'+aType+'1',c2='CT'+aType+'2';const ca=curPrices[c1],cb=curPrices[c2];const curVal=(ca!=null&&cb!=null)?+(ca-cb).toFixed(3):ANN_FLAT[aType]?.at(-1)?.value??null;html+=`<tr><td class="td-grp td-grp-ann">${ANNUAL_NICE[aType]}</td><td class="td-fld">Price (¢/lb)</td>`;html+=barCellHTML(curVal,computePctile(curVal,ANN_FLAT[aType],ld,5,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,ANN_FLAT[aType],ld,10,FND_EXCL));html+=barCellHTML(curVal,computePctile(curVal,ANN_FLAT[aType],ld,25,FND_EXCL));html+=`</tr>`;});
+  document.getElementById('pct-tbody').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DASHBOARD INIT
+// ═══════════════════════════════════════════════════════════════════════
+function initDash(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('meta').innerHTML=`Range: <b>${META.y0}–${META.y1}</b> &nbsp;|&nbsp; Latest: <b>${META.latest}</b><br>Records: <b>${META.n.toLocaleString()}</b> &nbsp;|&nbsp; Continuous OHLCV: <b>${CONT_OHLCV.length.toLocaleString()} pts</b>`;
+  const chips=document.getElementById('chips');
+  for(let y=META.y1;y>=META.y0;y--){const c=document.createElement('div');c.className='yc';c.textContent=y;c.dataset.year=y;c.onclick=()=>{c.classList.toggle('on');applyYears();};chips.appendChild(c);}
+  const grid=document.getElementById('inp-grid');
+  for(const c of CONTRACTS){const g=document.createElement('div');g.className='inp-grp';const latest=DATA_ARR[c].PX_LAST?.at(-1)?.value;g.innerHTML=`<div class="inp-lbl">${c}</div><input class="inp-field" id="inp-${c}" type="number" step="0.01" placeholder="${latest?latest.toFixed(2):'latest'}">`;grid.appendChild(g);}
+  const ctSel=document.getElementById('ta-contract');for(const c of CONTRACTS)ctSel.innerHTML+=`<option value="${c}">${c}</option>`;
+  quickSelect(5);buildPanelDOM('panel-sea-abs');renderPanel('panel-sea-abs');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TAB SWITCHER
+// ═══════════════════════════════════════════════════════════════════════
+function showTab(id,el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');el.classList.add('active');
+  document.getElementById('year-bar').style.display=(id==='pct'||id==='ta')?'none':'flex';
+  const pid='panel-'+id;
+  if(id==='pct'){if(document.getElementById(pid).dataset.rendered!=='true'){renderPctTable();document.getElementById(pid).dataset.rendered='true';}}
+  else if(id==='ta'){if(document.getElementById(pid).dataset.rendered!=='true'){renderTAChart();document.getElementById(pid).dataset.rendered='true';}}
+  else if(document.getElementById(pid).dataset.rendered!=='true')renderPanel(pid);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANEL DOM + SEASONALITY CHARTS
+// ═══════════════════════════════════════════════════════════════════════
+function buildPanelDOM(pid){
+  const panel=document.getElementById(pid);if(panel.querySelector('.ct-row,.spd-row'))return;
+  if(pid.includes('sea')){CONTRACTS.forEach(c=>{const row=document.createElement('div');row.className='ct-row';row.innerHTML=`<div class="ct-lbl">${c}</div><div class="charts-row">`+FIELDS.map(f=>`<div class="chart-box"><div class="chart-lbl">${FLD_NICE[f]}</div><div class="cdiv" id="ch-${pid}-${c}-${f}"></div></div>`).join('')+`</div>`;panel.appendChild(row);});}
+  if(pid.includes('spd')){SPREAD_TYPES.forEach((sType,i)=>{const aType=ANNUAL_TYPES[i];const row=document.createElement('div');row.className='spd-row';row.innerHTML=`<div class="spd-header"><div class="spd-lbl">📊 ${SPREAD_NICE[sType]}<small style="font-size:10px;opacity:.55;margin-left:8px">CALENDAR</small></div><div class="ann-lbl">📈 ${ANNUAL_NICE[aType]}<small style="font-size:10px;opacity:.55;margin-left:8px">ANNUAL</small></div></div><div class="spd-charts"><div class="spd-box"><div class="chart-lbl">${SPREAD_NICE[sType]} (¢/lb)</div><div class="sdiv" id="ch-${pid}-cal-${sType}"></div></div><div class="spd-box"><div class="chart-lbl">${ANNUAL_NICE[aType]} (¢/lb)</div><div class="sdiv" id="ch-${pid}-ann-${aType}"></div></div></div>`;panel.appendChild(row);});}
+}
+const SEA_LAY=(yLbl,zl)=>({xaxis:{title:{text:'Day of Year',font:{size:12,color:'#3d5568'}},color:'#3d5568',gridcolor:'#e8edf2',tickvals:[1,32,60,91,121,152,182,213,244,274,305,335],ticktext:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],range:[1,366],showline:true,linecolor:'#c5d0da',tickfont:{size:11}},yaxis:{title:{text:yLbl,font:{size:12,color:'#3d5568'}},color:'#3d5568',gridcolor:'#e8edf2',zeroline:zl,zerolinecolor:'#8090a0',zerolinewidth:1.5,showline:true,linecolor:'#c5d0da',tickfont:{size:11}},plot_bgcolor:'#fff',paper_bgcolor:'#fff',font:{color:'#3d5568',family:'IBM Plex Mono',size:11},showlegend:true,legend:{x:1.01,y:1,bgcolor:'rgba(255,255,255,.95)',bordercolor:'#c5d0da',borderwidth:1,font:{size:10},title:{text:'Year',font:{color:'#8b5e10',size:11}}},hovermode:'closest',margin:{l:55,r:68,t:8,b:42},autosize:true});
+function mkTraces(dataObj,years){if(!dataObj)return[];const ly=years.at(-1)?.toString();return years.map((yr,i)=>{const ys=yr.toString();if(!dataObj[ys])return null;const{doy,val}=dataObj[ys];return{x:doy,y:val,mode:'lines',name:ys,line:{color:SEA_COLORS[i%SEA_COLORS.length],width:ys===ly?2.8:1.4},opacity:ys===ly?1:0.75,hovertemplate:`<b>${ys}</b> DoY %{x} → %{y:.3f}<extra></extra>`};}).filter(Boolean);}
+function renderChart(id,dataObj,yLbl,zl){const el=document.getElementById(id);if(!el)return;Plotly.react(el,mkTraces(dataObj,ACTIVE_YEARS),SEA_LAY(yLbl,zl),{responsive:true,displayModeBar:false});}
+function renderPanel(pid){buildPanelDOM(pid);const isAbs=pid.includes('abs'),isSea=pid.includes('sea');if(isSea)CONTRACTS.forEach(c=>FIELDS.forEach(f=>{renderChart(`ch-${pid}-${c}-${f}`,isAbs?SEA[c][f]:SEA_PCT[c][f],isAbs?FLD_NICE[f]:f==='HIST_CALL_IMP_VOL'?'Δ pp from Jan 1':'% Δ from Jan 1',!isAbs);}));else{const yL=isAbs?'Spread (¢/lb)':'Δ from Jan 1 (¢)';SPREAD_TYPES.forEach((sType,i)=>{const aType=ANNUAL_TYPES[i];renderChart(`ch-${pid}-cal-${sType}`,isAbs?SPD[sType]:SPD_CHG[sType],yL,!isAbs);renderChart(`ch-${pid}-ann-${aType}`,isAbs?ANN[aType]:ANN_CHG[aType],yL,!isAbs);});}document.getElementById(pid).dataset.rendered='true';}
+function updateAll(){['panel-sea-abs','panel-sea-pct','panel-spd-abs','panel-spd-chg'].forEach(p=>{if(document.getElementById(p).dataset.rendered==='true')renderPanel(p);});}
+
+// ═══════════════════════════════════════════════════════════════════════
+// YEAR CONTROLS
+// ═══════════════════════════════════════════════════════════════════════
+function applyYears(){ACTIVE_YEARS=[...document.querySelectorAll('.yc.on')].map(c=>+c.dataset.year).sort();if(!ACTIVE_YEARS.length)ACTIVE_YEARS=[META.y1];updateAll();}
+function quickSelect(n){document.querySelectorAll('.yc').forEach(c=>{const y=+c.dataset.year;if(n===0)c.classList.remove('on');else if(n>=999)c.classList.add('on');else c.classList.toggle('on',y>META.y1-n);});applyYears();}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════
+function pDate(s){const p=s.split('/');if(p.length!==3)return null;let[m,d,y]=p.map(Number);if(y<100)y+=y<50?2000:1900;const dt=new Date(y,m-1,d);return isNaN(dt.getTime())?null:dt;}
+function dKey(d){return`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;}
+function dkToDate(k){const[y,m,d]=k.split('-').map(Number);return new Date(y,m,d);}
+function getDOY(d){const u=Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());return Math.floor((u-Date.UTC(d.getFullYear(),0,0))/86400000);}
+function renderTAChart(){
+  const ohlcv=getSelectedOHLCV();if(!ohlcv.length)return;
+  const dates=ohlcv.map(p=>p.date),O=ohlcv.map(p=>p.o),H=ohlcv.map(p=>p.h),L=ohlcv.map(p=>p.l),C=ohlcv.map(p=>p.c);
+  const ct=document.getElementById('ta-charttype').value;
+  const traces=[];
+  if(ct==='candle')traces.push({type:'candlestick',x:dates,open:O,high:H,low:L,close:C,name:'Price',increasing:{line:{color:'#2e7d32',width:1},fillcolor:'#e8f5e9'},decreasing:{line:{color:'#c62828',width:1},fillcolor:'#ffebee'},hovertemplate:'O:%{open:.2f} H:%{high:.2f} L:%{low:.2f} C:%{close:.2f}<extra></extra>'});
+  else if(ct==='ohlc')traces.push({type:'ohlc',x:dates,open:O,high:H,low:L,close:C,name:'Price',increasing:{line:{color:'#2e7d32'}},decreasing:{line:{color:'#c62828'}}});
+  else traces.push({x:dates,y:C,mode:'lines',name:'Price',line:{color:'#18252f',width:1.5}});
+
+  const smaConf={sma5:[5,'#007c91',1,'dot'],sma20:[20,'#1565c0',1.4,'solid'],sma50:[50,'#e65c00',1.8,'solid'],sma100:[100,'#4e342e',1.4,'dot'],sma200:[200,'#6a1fa0',2,'solid']};
+  const emaConf={ema20:[20,'#00695c',1.4,'dash'],ema50:[50,'#880e4f',1.6,'dash']};
+  for(const[k,[p,col,w,dash]]of Object.entries(smaConf)){if(!TA_SHOW[k])continue;traces.push({x:dates,y:calcSMA(C,p),mode:'lines',name:k.toUpperCase(),line:{color:col,width:w,dash},hoverinfo:'skip'});}
+  for(const[k,[p,col,w,dash]]of Object.entries(emaConf)){if(!TA_SHOW[k])continue;traces.push({x:dates,y:calcEMA(C,p),mode:'lines',name:k.toUpperCase(),line:{color:col,width:w,dash},hoverinfo:'skip'});}
+
+  if(TA_SHOW.bb){const bb=calcBB(C);
+    traces.push({x:dates,y:bb.map(b=>b.u),mode:'lines',name:'BB Upper',line:{color:'rgba(55,71,79,.6)',width:1,dash:'dot'},hoverinfo:'skip'});
+    traces.push({x:dates,y:bb.map(b=>b.l),mode:'lines',name:'BB Lower',fill:'tonexty',fillcolor:'rgba(55,71,79,.07)',line:{color:'rgba(55,71,79,.6)',width:1,dash:'dot'},hoverinfo:'skip'});
+    traces.push({x:dates,y:bb.map(b=>b.m),mode:'lines',name:'BB Mid',line:{color:'rgba(55,71,79,.4)',width:.8},hoverinfo:'skip'});}
+  if(TA_SHOW.fib){const mn=Math.min(...C),mx=Math.max(...C),r=mx-mn;
+    [[0,'F 0%'],[0.236,'F 23.6%'],[0.382,'F 38.2%'],[0.5,'F 50%'],[0.618,'F 61.8%'],[0.786,'F 78.6%'],[1,'F 100%']].forEach(([f,n],i)=>{
+      traces.push({x:[dates[0],dates[dates.length-1]],y:[mn+r*f,mn+r*f],mode:'lines',name:n,line:{color:['#795548','#bf360c','#e53935','#f9a825','#43a047','#1565c0','#6a1fa0'][i],width:1,dash:'longdash'},hoverinfo:'skip'});});}
+  if(TA_SHOW.psar){const psar=calcPSAR(H,L,C);traces.push({x:dates,y:psar,mode:'markers',name:'PSAR',marker:{color:psar.map((v,i)=>v<C[i]?'#2e7d32':'#c62828'),size:3},hoverinfo:'skip'});}
+
+  let cpShapes=[];
+  if(TA_SHOW['candle-pat']){const cPats=detectCandlePatterns(ohlcv);buildPatternAlerts(cPats.slice(-8));
+    cPats.slice(-30).forEach(p=>{const pt=ohlcv[p.i];traces.push({x:[pt.date],y:[p.type==='bear'?pt.h*1.005:pt.l*0.995],mode:'markers+text',showlegend:false,marker:{color:p.type==='bull'?'#2e7d32':p.type==='bear'?'#c62828':'#ef6c00',size:8,symbol:p.type==='bull'?'triangle-up':'triangle-down'},text:[p.emoji],textposition:p.type==='bear'?'top center':'bottom center',textfont:{size:12},hovertemplate:`${p.name}<extra></extra>`});});}
+  if(TA_SHOW['chart-pat']){const cp=detectChartPatterns(ohlcv);buildChartPatternAlerts(cp);cp.forEach(p=>{if(p.shapes)cpShapes.push(...p.shapes);});}
+
+  Plotly.react('ta-main-ch',traces,{
+    xaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:12},rangeslider:{visible:false},type:'date'},
+    yaxis:{title:{text:'Price (¢/lb)',font:{size:13}},color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:12},side:'right'},
+    plot_bgcolor:'#fff',paper_bgcolor:'#fff',font:{color:'#3d5568',family:'IBM Plex Mono',size:12},
+    showlegend:true,legend:{orientation:'h',x:0,y:1.06,font:{size:10},bgcolor:'rgba(255,255,255,.9)'},
+    hovermode:'x unified',margin:{l:10,r:60,t:10,b:40},autosize:true,
+    shapes:[...cpShapes,...TA_USER_SHAPES],newshape:{line:{color:'#1455a8',width:1.5}},dragmode:'pan',
+  },{responsive:true,displayModeBar:true,modeBarButtonsToAdd:['drawline','drawopenpath','drawrect','eraseshape'],modeBarButtonsToRemove:['autoScale2d']});
+
+  const el=document.getElementById('ta-main-ch');
+  el.removeAllListeners&&el.removeAllListeners('plotly_relayout');
+  el.on('plotly_relayout',d=>{if(d.shapes)TA_USER_SHAPES=d.shapes.filter(s=>s.editable!==false);});
+
+  // Oscillators
+  const oscCfg={
+    rsi:{fn:()=>calcRSI(C),id:'osc-rsi-div',col:'#c62828',range:[0,100],hLines:[30,70],name:'RSI'},
+    stoch:{fn:()=>calcStoch(H,L,C),id:'osc-stoch-div',multi:true,name:'Stoch'},
+    wr:{fn:()=>calcWR(H,L,C),id:'osc-wr-div',col:'#6a1fa0',range:[-100,0],hLines:[-20,-80],name:'W%R'},
+    cci:{fn:()=>calcCCI(H,L,C),id:'osc-cci-div',col:'#007c91',hLines:[-100,100],name:'CCI'},
+    atr:{fn:()=>calcATR(H,L,C),id:'osc-atr-div',col:'#e65c00',name:'ATR'},
+    adx:{fn:()=>calcADX(H,L,C),id:'osc-adx-div',multi:true,name:'ADX'},
+  };
+  const oscLay={xaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:10},type:'date'},
+    yaxis:{color:'#3d5568',gridcolor:'#e8edf2',showline:true,linecolor:'#c5d0da',tickfont:{size:10},side:'right'},
+    plot_bgcolor:'#fff',paper_bgcolor:'#fafcff',font:{color:'#3d5568',family:'IBM Plex Mono',size:10},
+    showlegend:false,hovermode:'x unified',margin:{l:10,r:60,t:2,b:24},autosize:true};
+  for(const[k,cfg]of Object.entries(oscCfg)){
+    const panel=document.getElementById('osc-'+k);
+    if(!TA_SHOW[k]){panel.style.display='none';continue;}panel.style.display='block';
+    const vals=cfg.fn();
+    const lay={...oscLay,shapes:(cfg.hLines||[]).map(y=>({type:'line',x0:dates[0],x1:dates[dates.length-1],y0:y,y1:y,line:{color:'rgba(0,0,0,.2)',width:1,dash:'dot'}})),...(cfg.range?{yaxis:{...oscLay.yaxis,range:cfg.range}}:{})};
+    if(cfg.multi){
+      if(k==='stoch')Plotly.react(cfg.id,[{x:dates,y:vals.k,mode:'lines',name:'%K',line:{color:'#256428',width:1.5}},{x:dates,y:vals.d,mode:'lines',name:'%D',line:{color:'#e65c00',width:1,dash:'dot'}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false});
+      else if(k==='adx')Plotly.react(cfg.id,[{x:dates,y:vals.adx,mode:'lines',name:'ADX',line:{color:'#4e342e',width:2}},{x:dates,y:vals.pdi,mode:'lines',name:'+DI',line:{color:'#2e7d32',width:1.2}},{x:dates,y:vals.mdi,mode:'lines',name:'-DI',line:{color:'#c62828',width:1.2}}],{...lay,showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}}},{responsive:true,displayModeBar:false});
+    }else{Plotly.react(cfg.id,[{x:dates,y:vals,mode:'lines',name:cfg.name,line:{color:cfg.col,width:1.5}}],lay,{responsive:true,displayModeBar:false});}
+  }
+  const macdEl=document.getElementById('osc-macd');
+  if(!TA_SHOW.macd){macdEl.style.display='none';}else{macdEl.style.display='block';const m=calcMACD(C);
+    Plotly.react('osc-macd-div',[{x:dates,y:m.hist,type:'bar',name:'Hist',marker:{color:m.hist.map(v=>v===null?'transparent':v>=0?'rgba(46,125,50,.6)':'rgba(198,40,40,.6)')}},{x:dates,y:m.line,mode:'lines',name:'MACD',line:{color:'#1455a8',width:1.5}},{x:dates,y:m.sig,mode:'lines',name:'Signal',line:{color:'#e65c00',width:1,dash:'dot'}}],
+    {...oscLay,barmode:'relative',showlegend:true,legend:{orientation:'h',x:0,y:1.1,font:{size:9}},yaxis:{...oscLay.yaxis,zeroline:true,zerolinecolor:'#c5d0da'}},{responsive:true,displayModeBar:false});}
+}
+
+function buildPatternAlerts(pats){
+  const div=document.getElementById('ta-pattern-alerts');
+  const chartCards=[...div.querySelectorAll('.pat-card[data-type="chart"]')].map(e=>e.outerHTML).join('');
+  div.innerHTML=pats.map(p=>`<div class="pat-card ${p.type}" data-type="candle"><span class="pat-icon">${p.emoji}</span><span class="pat-name">${p.name}</span></div>`).join('')+chartCards;
+}
+function buildChartPatternAlerts(pats){
+  _detectedChartPats=pats;
+  const div=document.getElementById('ta-pattern-alerts');
+  const candleCards=[...div.querySelectorAll('.pat-card[data-type="candle"]')].map(e=>e.outerHTML).join('');
+  div.innerHTML=candleCards+pats.map((p,idx)=>`<div class="pat-card ${p.type}" data-type="chart" onclick="toggleChartPattern(${idx})" title="${p.desc}"><span class="pat-icon">${p.type==='bull'?'📈':p.type==='bear'?'📉':'📊'}</span><span class="pat-name">${p.name}</span><span style="font-size:9px;opacity:.55;margin-left:3px">▲toggle</span></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TA OPINION (15 indicators → BUY/SELL/HOLD gauge)
+// ═══════════════════════════════════════════════════════════════════════
+function renderTAOpinion(){
+  const ohlcv=getSelectedOHLCV();if(!ohlcv.length)return;
+  const C=ohlcv.map(p=>p.c),H=ohlcv.map(p=>p.h),L=ohlcv.map(p=>p.l),n=C.length-1,cur=C[n];
+  function fv(v){return v===null||v===undefined?'—':v.toFixed(2);}
+  function badge(s){const cls=s==='BUY'?'buy':s==='SELL'?'sell':'hold';return`<span class="sig-badge sig-${cls}">${s}</span>`;}
+  function sig(buyC,sellC){return buyC?'BUY':sellC?'SELL':'HOLD';}
+
+  const[s5,s20,s50,s100,s150,s200]=[5,20,50,100,150,200].map(p=>calcSMA(C,p));
+  const[e10,e20,e50]=[10,20,50].map(p=>calcEMA(C,p));
+  const rsi=calcRSI(C),macd=calcMACD(C),stoch=calcStoch(H,L,C),wr=calcWR(H,L,C),cci=calcCCI(H,L,C),adx=calcADX(H,L,C);
+  const[cRSI,cMACD,cSig,cK,cD,cWR,cCCI,cADX,cPDI,cMDI]=[rsi[n],macd.line[n],macd.sig[n],stoch.k[n],stoch.d[n],wr[n],cci[n],adx.adx[n],adx.pdi[n],adx.mdi[n]];
+
+  const stInds=[
+    {name:'SMA (5)',val:fv(s5[n]),signal:sig(cur>s5[n],cur<s5[n])},
+    {name:'SMA (20)',val:fv(s20[n]),signal:sig(cur>s20[n],cur<s20[n])},
+    {name:'EMA (10)',val:fv(e10[n]),signal:sig(cur>e10[n],cur<e10[n])},
+    {name:'RSI (14)',val:fv(cRSI),signal:sig(cRSI<35,cRSI>65)},
+    {name:'Williams %R',val:fv(cWR),signal:sig(cWR<-75,cWR>-25)},
+  ];
+  const mtInds=[
+    {name:'SMA (50)',val:fv(s50[n]),signal:sig(cur>s50[n],cur<s50[n])},
+    {name:'EMA (20)',val:fv(e20[n]),signal:sig(cur>e20[n],cur<e20[n])},
+    {name:'EMA (50)',val:fv(e50[n]),signal:sig(cur>e50[n],cur<e50[n])},
+    {name:'MACD',val:fv(cMACD),signal:sig(cMACD>cSig,cMACD<cSig)},
+    {name:'Stoch %K',val:fv(cK),signal:sig(cK>cD&&cK<75,cK<cD&&cK>25)},
+    {name:'CCI (14)',val:fv(cCCI),signal:sig(cCCI<-90,cCCI>90)},
+  ];
+  const ltInds=[
+    {name:'SMA (100)',val:fv(s100[n]),signal:sig(cur>s100[n],cur<s100[n])},
+    {name:'SMA (150)',val:fv(s150[n]),signal:sig(cur>s150[n],cur<s150[n])},
+    {name:'SMA (200)',val:fv(s200[n]),signal:sig(cur>s200[n],cur<s200[n])},
+    {name:'ADX/DMI',val:fv(cADX),signal:cADX>20?sig(cPDI>cMDI,cPDI<cMDI):'HOLD'},
+  ];
+  const all=[...stInds,...mtInds,...ltInds];
+  const score=all.reduce((a,{signal:s})=>a+(s==='BUY'?100:s==='SELL'?0:50),0)/all.length;
+  const label=score>=80?'Strong Buy':score>=60?'Buy':score>=40?'Neutral':score>=20?'Sell':'Strong Sell';
+  const col=score>=70?'#2e7d32':score>=50?'#7cb342':score>=30?'#ef6c00':'#c62828';
+  const rot=(score-50)*1.8;
+  function avgBadge(inds){const s=inds.reduce((a,{signal:s})=>a+(s==='BUY'?1:s==='SELL'?-1:0),0);return badge(s>0?'BUY':s<0?'SELL':'HOLD');}
+  function tbl(inds,title){return`<div class="opin-block"><div class="opin-block-title">${title}</div>${inds.map(({name:nm,val:v,signal:s})=>`<div class="opin-row"><span class="opin-name">${nm}</span><span class="opin-val">${v}</span>${badge(s)}</div>`).join('')}<div class="opin-avg-row"><span>Average</span>${avgBadge(inds)}</div></div>`;}
+
+  document.getElementById('opinion-wrap').innerHTML=
+    `<div class="gauge-section"><div class="gauge-title">Overall Technical Opinion</div>
+    <div class="gauge-outer"><div class="gauge-ring"></div><div class="gauge-inner"></div>
+    <div class="gauge-needle" style="transform:translateX(-50%) rotate(${rot}deg)"></div>
+    <div class="gauge-dot"></div></div>
+    <div class="gauge-score" style="color:${col}">${score.toFixed(0)}</div>
+    <div class="gauge-label" style="color:${col}">${label}</div>
+    <div style="font-size:11px;color:var(--txt3);margin-top:6px">Price: <b>${fv(cur)}</b> ¢/lb &nbsp;·&nbsp; ${fmtD(ohlcv[n].date)}</div></div>`+
+    `<div class="opinion-tables">${tbl(stInds,'📊 Short-Term')}${tbl(mtInds,'📈 Medium-Term')}${tbl(ltInds,'📏 Long-Term')}</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHEAT SHEET (50+ levels sorted high→low)
+// ═══════════════════════════════════════════════════════════════════════
+function renderCheatSheet(){
+  const ohlcv=getSelectedOHLCV();if(!ohlcv.length)return;
+  const C=ohlcv.map(p=>p.c),H=ohlcv.map(p=>p.h),L=ohlcv.map(p=>p.l);
+  const n=C.length-1,cur=C[n],lastH=H[n],lastL=L[n];
+  function piv(h,l,c){const pp=(h+l+c)/3;return{PP:pp,R1:2*pp-l,R2:pp+(h-l),R3:h+2*(pp-l),S1:2*pp-h,S2:pp-(h-l),S3:l-2*(h-pp)};}
+  function pivFib(h,l,c){const pp=(h+l+c)/3,r=h-l;return{PP:pp,'R1(38.2%)':pp+r*.382,'R2(61.8%)':pp+r*.618,'R3(100%)':pp+r,'S1(38.2%)':pp-r*.382,'S2(61.8%)':pp-r*.618,'S3(100%)':pp-r};}
+  function pivW(h,l,c){const pp=(h+l+2*c)/4;return{'PP(W)':pp,'R1(W)':2*pp-l,'R2(W)':pp+(h-l),'S1(W)':2*pp-h,'S2(W)':pp-(h-l)};}
+  const sMAs={SMA5:calcSMA(C,5)[n],SMA9:calcSMA(C,9)[n],SMA10:calcSMA(C,10)[n],SMA18:calcSMA(C,18)[n],SMA20:calcSMA(C,20)[n],SMA40:calcSMA(C,40)[n],SMA50:calcSMA(C,50)[n],SMA100:calcSMA(C,100)[n],SMA150:calcSMA(C,150)[n],SMA200:calcSMA(C,200)[n]};
+  const eMAs={'EMA5':calcEMA(C,5)[n],'EMA10':calcEMA(C,10)[n],'EMA20':calcEMA(C,20)[n],'EMA50':calcEMA(C,50)[n]};
+  const bb=calcBB(C,20,2)[n],bb1=calcBB(C,20,1)[n];
+  const bbLvls={'BB Upper(2σ)':bb.u,'BB Upper(1σ)':bb1?.u,'BB Middle':bb.m,'BB Lower(1σ)':bb1?.l,'BB Lower(2σ)':bb.l};
+  const wk52H=Math.max(...H.slice(-252)),wk52L=Math.min(...L.slice(-252)),r52=wk52H-wk52L;
+  const fibLvls={'52w High':wk52H,'Fib 78.6%':wk52L+r52*.786,'Fib 61.8%':wk52L+r52*.618,'Fib 50.0%':wk52L+r52*.5,'Fib 38.2%':wk52L+r52*.382,'Fib 23.6%':wk52L+r52*.236,'52w Low':wk52L};
+  const slice5=C.slice(-5),m5=slice5.reduce((a,b)=>a+b,0)/5,sd5=Math.sqrt(slice5.reduce((a,b)=>a+(b-m5)**2,0)/5);
+  const sdLvls={'2σ Up':m5+2*sd5,'1σ Up':m5+sd5,'Mean(5d)':m5,'1σ Down':m5-sd5,'2σ Down':m5-2*sd5};
+  const levels=[];
+  const add=(grp,obj)=>{for(const[k,v]of Object.entries(obj)){if(v===null||v===undefined||isNaN(v))continue;levels.push({name:k,level:v,group:grp,bull:v<cur});}};
+  add('Classical Pivots',piv(lastH,lastL,cur));add('Fibonacci Pivots',pivFib(lastH,lastL,cur));
+  add("Woodie's Pivots",pivW(lastH,lastL,cur));add('Simple Moving Avgs',sMAs);add('Exp. Moving Avgs',eMAs);
+  add('Bollinger Bands',bbLvls);add('Fibonacci Retrace',fibLvls);add('Std Dev (5-day)',sdLvls);
+  levels.sort((a,b)=>b.level-a.level);
+  document.getElementById('cs-price-tag').textContent=`Current: ${cur.toFixed(2)} ¢/lb`;
+  let html='',lastGrp='',inserted=false;
+  for(const lv of levels){
+    if(!inserted&&lv.level<cur){html+=`<tr class="current-price"><td colspan="5" style="text-align:center;letter-spacing:2px;font-weight:700">⬅ CURRENT PRICE: ${cur.toFixed(2)} ¢/lb</td></tr>`;inserted=true;}
+    if(lv.group!==lastGrp){html+=`<tr class="cs-group-hdr"><td colspan="5">${lv.group}</td></tr>`;lastGrp=lv.group;}
+    const diff=lv.level-cur;
+    html+=`<tr class="${lv.bull?'bull-row':'bear-row'}"><td class="cs-name">${lv.name}</td><td class="cs-level" style="color:${lv.bull?'var(--blue)':'#c62828'}">${lv.level.toFixed(2)}</td><td class="cs-diff">${diff>0?'+':''}${diff.toFixed(2)}</td><td style="text-align:center">${lv.bull?'<span class="cs-bull">▲ Support</span>':'<span class="cs-bear">▼ Resist.</span>'}</td><td style="font-size:10px;color:var(--txt3)">${lv.group}</td></tr>`;
+  }
+  if(!inserted)html+=`<tr class="current-price"><td colspan="5" style="text-align:center">⬅ CURRENT: ${cur.toFixed(2)}</td></tr>`;
+  document.getElementById('cs-tbody').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TA SUB-TAB SWITCHER
+// ═══════════════════════════════════════════════════════════════════════
+function showTATab(id,el){
+  document.querySelectorAll('.ta-stab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.ta-subpanel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');document.getElementById('ta-'+id+'-panel').classList.add('active');
+  if(id==='opinion')renderTAOpinion();if(id==='cheatsheet')renderCheatSheet();
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PERCENTILE HELPERS
