@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cotton COT Estimator — PDF Parser + Model vs Actual</title>
+<title>Cotton COT Estimator — Direct PDF Parser + Model vs Actual</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{--bg:#f5f7fa;--card:#fff;--txt:#1a1a2e;--acc:#2a5298;--acc2:#1a8c4e;--warn:#d4880f;--err:#c0392b;--border:#dde1e7;--font:'Segoe UI',system-ui,sans-serif;}
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -67,9 +68,10 @@
   .comparison-box.predicted{background:#e8f0fe;border:2px solid #2a5298;}
   .comparison-box.actual{background:#e6f4ea;border:2px solid #1a8c4e;}
   .comparison-box.error{background:#fce8e6;border:2px solid #c0392b;}
-  .pdf-parse-box{background:#f0f7ff;border:2px dashed #2a5298;padding:12px;border-radius:6px;margin:8px 0;text-align:center;cursor:pointer;transition:all .2s;}
+  .pdf-parse-box{background:#f0f7ff;border:2px dashed #2a5298;padding:20px;border-radius:6px;margin:8px 0;text-align:center;cursor:pointer;transition:all .2s;}
   .pdf-parse-box:hover{background:#e0efff;border-style:solid;}
   .pdf-parse-box.dragover{background:#d0e7ff;border-style:solid;}
+  .pdf-file-name{font-size:0.85rem;color:#555;margin-top:8px;font-weight:600;}
   @media(max-width:600px){.grid{grid-template-columns:1fr;}.flex{flex-direction:column;}.flex>div{width:100%;}.comparison-grid{grid-template-columns:1fr;}}
 </style>
 <base target="_blank">
@@ -77,8 +79,8 @@
 </head>
 <body>
 
-<h1>🎯 Cotton COT Estimator — PDF Parser + Model vs Actual</h1>
-<p class="subtitle">Upload or paste ICE Daily PDF text → Parse OI/Volume/Price → Predict COT → Compare with actual CFTC API data</p>
+<h1>🎯 Cotton COT Estimator — Direct PDF Parser + Model vs Actual</h1>
+<p class="subtitle">Upload ICE Daily PDF file → Auto-extract text → Parse OI/Volume/Price → Predict COT → Compare with actual CFTC API data</p>
 
 <div class="section-title">📚 Step 1: Load Historical Data</div>
 <div class="grid">
@@ -102,27 +104,30 @@
   </div>
 </div>
 
-<div class="section-title">📄 Step 2: Parse Latest ICE Daily PDF</div>
+<div class="section-title">📄 Step 2: Upload ICE Daily PDF File</div>
 <div class="grid">
   <div class="card card-full">
-    <h2>Upload or Paste ICE Daily Futures PDF Text</h2>
+    <h2>Upload ICE Daily Futures PDF</h2>
     <div class="highlight">
-      <strong>Instructions:</strong> Copy the entire text from your ICE Daily Futures PDF report and paste below, 
-      or drag & drop a .txt file. The parser auto-extracts date, contract prices, volumes, OI, and OI changes.
+      <strong>Instructions:</strong> Drag & drop your ICE Daily Market Report PDF file below, or click to browse. 
+      The page uses PDF.js to read the PDF directly and extract the futures table data automatically.
     </div>
-    <div class="pdf-parse-box" id="dropZone" onclick="document.getElementById('pdfFileInput').click()">
-      <div style="font-size:2rem;">📄</div>
-      <div style="font-size:0.85rem;font-weight:600;">Click to upload .txt file or paste text below</div>
-      <div class="small">Supports ICE Daily Market Report format</div>
+    <div class="pdf-parse-box" id="dropZone">
+      <div style="font-size:2.5rem;">📄</div>
+      <div style="font-size:0.9rem;font-weight:600;">Drop PDF file here or click to browse</div>
+      <div class="small">Accepts .pdf files — ICE Daily Market Report format</div>
+      <div class="pdf-file-name" id="pdfFileName"></div>
     </div>
-    <input type="file" id="pdfFileInput" accept=".txt,.csv" style="display:none;" onchange="handleFileUpload(event)">
-    <textarea id="pdfTextInput" placeholder="Paste ICE Daily Market Report text here..."></textarea>
-    <div class="flex" style="margin-top:8px;">
-      <button onclick="parsePdfText()">🔍 Parse PDF Data</button>
+    <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;">
+    <div style="margin-top:8px;">
+      <button onclick="parsePdfFile()" id="parsePdfBtn" disabled>🔍 Extract & Parse PDF Data</button>
       <button class="btn-sm btn-sec" onclick="clearPdfInput()">Clear</button>
-      <button class="btn-sm btn-warn" onclick="loadSamplePdf()">Load Sample (Apr 23)</button>
     </div>
     <div id="pdfParseStatus" class="status"></div>
+    <div id="pdfExtractedText" style="display:none;margin-top:10px;">
+      <h3>Extracted PDF Text (Debug)</h3>
+      <textarea id="pdfRawText" style="min-height:80px;font-size:0.72rem;" readonly></textarea>
+    </div>
   </div>
 </div>
 
@@ -286,6 +291,11 @@
 <script>
 
 /* ===========================================================
+   PDF.JS SETUP
+   =========================================================== */
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ===========================================================
    CONSTANTS
    =========================================================== */
 const COT_API = 'https://publicreporting.cftc.gov/resource/kh3c-gbw2.json';
@@ -301,6 +311,7 @@ const MONTH_NAMES = {'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,'jul':6,'au
 var oiData = [], cotHistory = [], mergedHistory = [];
 var latestWeekData = null, models = null, bestModel = null;
 var actualCotData = null, charts = {};
+var currentPdfFile = null, extractedPdfText = '';
 
 /* ===========================================================
    UTILITIES
@@ -361,44 +372,207 @@ function fetchJson(url,timeout){
 }
 
 /* ===========================================================
-   FILE UPLOAD / DRAG & DROP
+   PDF FILE HANDLING — DRAG & DROP + FILE INPUT
    =========================================================== */
 var dropZone=$('dropZone');
+var fileInput=$('pdfFileInput');
+
+dropZone.addEventListener('click',function(){fileInput.click();});
 dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('dragover');});
 dropZone.addEventListener('dragleave',function(e){e.preventDefault();this.classList.remove('dragover');});
-dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('dragover');var f=e.dataTransfer.files[0];if(f)readFile(f);});
+dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('dragover');var f=e.dataTransfer.files[0];if(f&&f.name.toLowerCase().endsWith('.pdf')){handlePdfFile(f);}else{showStatus('pdfParseStatus','Please drop a .pdf file','err');}});
 
-function handleFileUpload(e){var f=e.target.files[0];if(f)readFile(f);}
-function readFile(file){
-  var reader=new FileReader();
-  reader.onload=function(e){$('pdfTextInput').value=e.target.result;showStatus('pdfParseStatus','Loaded file: '+file.name,'ok');};
-  reader.onerror=function(){showStatus('pdfParseStatus','Error reading file','err');};
-  reader.readAsText(file);
+fileInput.addEventListener('change',function(e){var f=e.target.files[0];if(f)handlePdfFile(f);});
+
+function handlePdfFile(file){
+  currentPdfFile=file;
+  $('pdfFileName').textContent='Selected: '+file.name;
+  showStatus('pdfParseStatus','PDF ready: '+file.name+'. Click "Extract & Parse" to process.','ok');
+  $('parsePdfBtn').disabled=false;
 }
 
-function loadSamplePdf(){
-  var sample='Futures Daily Market Report for Cotton No 2  23-Apr-2026\n'+
-    'DAILY PRICE RANGE\nSETTLE\nVOLUME AND OI TOTALS\n'+
-    'COMMODITY CONTRACT NAME MONTH OPEN# HIGH LOW CLOSE# PRICE CHANGE TOTAL VOLUME OI CHANGE EFP EFS BLOCK VOLUME SPREAD VOLUME\n'+
-    'CT-COTTON FUTURES\n'+
-    'CT May-26 76.33 77.25 75.40 76.90 76.80 0.47 1,660 569 -1,517 652 0 0 904\n'+
-    'CT Jul-26 78.64 79.76 77.66 79.38 79.45 0.81 43,745 164,817 -5,530 20 500 120 12,009\n'+
-    'CT Oct-26 80.84 0.64 3 54 1 0 0 0 3\n'+
-    'CT Dec-26 80.11 81.11 79.31 80.61 80.68 0.52 22,543 113,874 251 308 132 144 13,186\n'+
-    'CT Mar-27 81.02 81.99 80.21 81.46 81.56 0.53 5,159 21,456 274 0 0 0 4,525\n'+
-    'CT May-27 81.31 82.16 80.45 81.73 81.71 0.47 3,068 6,076 223 220 0 0 2,343\n'+
-    'CT Jul-27 80.48 81.28 79.72 80.83 80.81 0.37 1,367 3,450 615 0 100 0 961\n'+
-    'CT Oct-27 76.35 0.22 0 2 0 0 0 0 0\n'+
-    'CT Dec-27 74.75 75.68 74.52 75.06 75.04 0.21 895 10,039 298 0 0 0 414\n'+
-    'CT Mar-28 76.13 0.20 0 191 0 0 0 0 0\n'+
-    'CT May-28 76.80 0.17 0 18 0 0 0 0 0\n'+
-    'CT Jul-28 77.37 0.17 0 2 0 0 0 0 0\n'+
-    'CT Oct-28 76.61 0.17 0 0 0 0 0 0\n'+
-    'CT Dec-28 74.87 0.17 0 1 0 0 0 0 0\n'+
-    'CT Mar-29 76.04 0.17 0 0 0 0 0 0\n'+
-    'Totals for CT: 78,440 320,549 -5,385 1,200 732 264 34,345';
-  $('pdfTextInput').value=sample;
-  showStatus('pdfParseStatus','Sample PDF data loaded (Apr 23, 2026)','ok');
+/* ===========================================================
+   PDF.JS TEXT EXTRACTION
+   =========================================================== */
+function parsePdfFile(){
+  if(!currentPdfFile){showStatus('pdfParseStatus','Select a PDF file first','err');return;}
+  showStatus('pdfParseStatus','Reading PDF with PDF.js...','warn');
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var typedarray=new Uint8Array(e.target.result);
+    extractTextFromPdf(typedarray);
+  };
+  reader.onerror=function(){showStatus('pdfParseStatus','Error reading PDF file','err');};
+  reader.readAsArrayBuffer(currentPdfFile);
+}
+
+function extractTextFromPdf(pdfData){
+  pdfjsLib.getDocument({data:pdfData}).promise.then(function(pdf){
+    var maxPages=pdf.numPages;
+    var countPromises=[];
+    for(var i=1;i<=maxPages;i++){
+      var page=pdf.getPage(i);
+      countPromises.push(page.then(function(page){
+        return page.getTextContent().then(function(text){
+          return text.items.map(function(s){return s.str;}).join(' ');
+        });
+      }));
+    }
+    return Promise.all(countPromises);
+  }).then(function(pagesText){
+    extractedPdfText=pagesText.join('\n');
+    $('pdfRawText').value=extractedPdfText;
+    $('pdfExtractedText').style.display='block';
+    showStatus('pdfParseStatus','PDF text extracted ('+extractedPdfText.length+' chars). Parsing ICE data...','warn');
+    parseExtractedPdfText(extractedPdfText);
+  }).catch(function(err){
+    showStatus('pdfParseStatus','PDF extraction error: '+err.message,'err');
+  });
+}
+
+/* ===========================================================
+   PARSE EXTRACTED PDF TEXT (ICE FORMAT)
+   =========================================================== */
+function parseExtractedPdfText(text){
+  var lines=text.split(/[\n\r]+/);
+  var reportDate=null,contracts={},totals=null;
+
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();if(!line)continue;
+
+    // Parse date from header: "Futures Daily Market Report for Cotton No 2 23-Apr-2026"
+    var headerMatch=line.match(/Futures Daily Market Report for Cotton No 2\s+(\d{1,2})[-\/]([A-Za-z]{3})[-\/](\d{2,4})/i);
+    if(!headerMatch) headerMatch=line.match(/Cotton No 2\s+(\d{1,2})[-\/]([A-Za-z]{3})[-\/](\d{2,4})/i);
+    if(headerMatch){
+      var day=parseInt(headerMatch[1]);
+      var monthStr=headerMatch[2].toLowerCase();
+      var year=parseInt(headerMatch[3]);
+      if(year<50)year+=2000;else if(year<100)year+=1900;
+      if(MONTH_NAMES[monthStr]!==undefined) reportDate=new Date(year,MONTH_NAMES[monthStr],day);
+    }
+
+    // ICE full format: CT Jul-26 78.64 79.76 77.66 79.38 79.45 0.81 43,745 164,817 -5,530 20 500 120 12,009
+    var fullMatch=line.match(/^CT\s+([A-Z][a-z]{2}-\d{2})\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.-]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
+    if(fullMatch){
+      var contract=fullMatch[1];
+      var settle=parseFloat(fullMatch[6]);
+      var priceChg=parseFloat(fullMatch[7]);
+      var volume=parseInt(fullMatch[8].replace(/,/g,''));
+      var oi=parseInt(fullMatch[9].replace(/,/g,''));
+      var oiChgStr=fullMatch[10].replace(/,/g,'');
+      var oiChg=parseInt(oiChgStr);
+      contracts[contract]={settle:settle,priceChg:priceChg,volume:volume,oi:oi,oiChg:oiChg};
+    }
+
+    // Short format: CT Oct-26 80.84 0.64 3 54 1 0 0 0 3
+    var shortMatch=line.match(/^CT\s+([A-Z][a-z]{2}-\d{2})\s+([\d.]+)\s+([\d.-]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
+    if(shortMatch&&!contracts[shortMatch[1]]){
+      var contract=shortMatch[1];
+      var settle=parseFloat(shortMatch[2]);
+      var priceChg=parseFloat(shortMatch[3]);
+      var volume=parseInt(shortMatch[4].replace(/,/g,''));
+      var oi=parseInt(shortMatch[5].replace(/,/g,''));
+      var oiChg=parseInt(shortMatch[6].replace(/,/g,''));
+      contracts[contract]={settle:settle,priceChg:priceChg,volume:volume,oi:oi,oiChg:oiChg};
+    }
+
+    // Totals line: Totals for CT: 78,440 320,549 -5,385 ...
+    var totalsMatch=line.match(/Totals for CT:\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
+    if(totalsMatch){
+      totals={
+        volume:parseInt(totalsMatch[1].replace(/,/g,'')),
+        oi:parseInt(totalsMatch[2].replace(/,/g,'')),
+        oiChg:parseInt(totalsMatch[3].replace(/,/g,'').replace('+',''))
+      };
+    }
+  }
+
+  if(!reportDate){showStatus('pdfParseStatus','No date found in PDF. Expected format like "23-Apr-2026"','err');return;}
+  if(Object.keys(contracts).length===0){showStatus('pdfParseStatus','No contract data parsed from PDF. Check ICE format.','err');return;}
+
+  // Determine front month
+  var frontContract=getActiveContract(reportDate);
+  var frontCode=frontContract.replace(/\d$/,'');
+  var frontYear=reportDate.getFullYear();
+  var frontMonthNum=CONTRACT_MONTHS[frontCode];
+  var frontMonthName=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][frontMonthNum];
+
+  var frontData=null;
+  for(var key in contracts){
+    if(key.indexOf(frontMonthName)===0){frontData=contracts[key];break;}
+  }
+  if(!frontData){frontData=contracts[Object.keys(contracts)[0]];}
+
+  var combinedTotals=totals||{volume:0,oi:0,oiChg:0};
+  if(!combinedTotals.oi){
+    var sumOI=0,sumVol=0,sumOIChg=0;
+    for(var k in contracts){if(contracts[k].oi)sumOI+=contracts[k].oi;if(contracts[k].volume)sumVol+=contracts[k].volume;if(contracts[k].oiChg)sumOIChg+=contracts[k].oiChg;}
+    combinedTotals={volume:sumVol,oi:sumOI,oiChg:sumOIChg};
+  }
+
+  var lastCot=mergedHistory.length>0?mergedHistory[0]:null;
+
+  latestWeekData={
+    date:reportDate.toISOString().split('T')[0],
+    report_date:reportDate,
+    front_oi_level:frontData.oi,
+    front_oi_delta:frontData.oiChg,
+    comb_oi_level:combinedTotals.oi,
+    comb_oi_delta:combinedTotals.oiChg,
+    front_vol_avg:frontData.volume,
+    front_vol_delta:0,
+    front_velo:frontData.oi>0?frontData.volume/frontData.oi:0,
+    price_delta:frontData.priceChg,
+    price_level:frontData.settle,
+    price_vol_interact:frontData.priceChg*frontData.volume/1000,
+    mm_net_lag1:lastCot?lastCot.mm_net:null,
+    active_contract:frontContract,
+    all_contracts:contracts
+  };
+
+  showStatus('pdfParseStatus','Parsed: '+fmtDate(reportDate)+' | Front: '+frontContract+' | OI: '+frontData.oi+' | Vol: '+frontData.volume+' | Contracts: '+Object.keys(contracts).length,'ok');
+  renderPdfParsed(latestWeekData,contracts);
+  $('predictBtn').disabled=false;
+  $('compareBtn').disabled=false;
+}
+
+function renderPdfParsed(latest,contracts){
+  $('pdfParsedSection').style.display='block';
+  var sumHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
+  sumHtml+='<tr><td>Report Date</td><td class="num">'+fmtDate(latest.date)+'</td></tr>';
+  sumHtml+='<tr><td>Active Contract</td><td class="num">'+latest.active_contract+'</td></tr>';
+  sumHtml+='<tr><td>Front Month OI</td><td class="num">'+fmtNum(latest.front_oi_level,0)+'</td></tr>';
+  sumHtml+='<tr><td>Front OI Δ</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
+  sumHtml+='<tr><td>Combined OI</td><td class="num">'+fmtNum(latest.comb_oi_level,0)+'</td></tr>';
+  sumHtml+='<tr><td>Combined OI Δ</td><td class="num '+(latest.comb_oi_delta>=0?'pos':'neg')+'">'+(latest.comb_oi_delta>0?'+':'')+fmtNum(latest.comb_oi_delta,0)+'</td></tr>';
+  sumHtml+='<tr><td>Front Volume</td><td class="num">'+fmtNum(latest.front_vol_avg,0)+'</td></tr>';
+  sumHtml+='<tr><td>Volume/OI Ratio</td><td class="num">'+fmtNum(latest.front_velo,4)+'</td></tr>';
+  sumHtml+='<tr><td>Price Change</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
+  sumHtml+='<tr><td>Last Known MM Net</td><td class="num">'+fmtNum(latest.mm_net_lag1,0)+'</td></tr>';
+  sumHtml+='</tbody></table>';
+  $('pdfParsedSummary').innerHTML=sumHtml;
+
+  var contHtml='<table><thead><tr><th>Contract</th><th>Settle</th><th>Δ</th><th>Vol</th><th>OI</th><th>OI Δ</th></tr></thead><tbody>';
+  for(var k in contracts){
+    var c=contracts[k];
+    contHtml+='<tr><td>'+k+'</td><td class="num">'+fmtNum(c.settle,2)+'</td><td class="num '+(c.priceChg>=0?'pos':'neg')+'">'+(c.priceChg>0?'+':'')+fmtNum(c.priceChg,2)+'</td><td class="num">'+fmtNum(c.volume,0)+'</td><td class="num">'+fmtNum(c.oi,0)+'</td><td class="num '+(c.oiChg>=0?'pos':'neg')+'">'+(c.oiChg>0?'+':'')+fmtNum(c.oiChg,0)+'</td></tr>';
+  }
+  contHtml+='</tbody></table>';
+  $('pdfParsedContracts').innerHTML=contHtml;
+}
+
+function clearPdfInput(){
+  currentPdfFile=null;
+  extractedPdfText='';
+  $('pdfFileName').textContent='';
+  $('pdfFileInput').value='';
+  $('pdfParsedSection').style.display='none';
+  $('pdfExtractedText').style.display='none';
+  $('parsePdfBtn').disabled=true;
+  latestWeekData=null;
+  $('predictBtn').disabled=true;
+  $('compareBtn').disabled=true;
 }
 
 /* ===========================================================
@@ -580,170 +754,6 @@ function alignHistoricalData(){
 }
 
 /* ===========================================================
-   STEP 2B: ENHANCED PDF PARSER
-   =========================================================== */
-function parsePdfText(){
-  var text=$('pdfTextInput').value.trim();
-  if(!text){showStatus('pdfParseStatus','Paste PDF text first','err');return;}
-
-  var lines=text.split(/
-?
-/);
-  var reportDate=null,contracts={},totals=null;
-
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i].trim();if(!line)continue;
-
-    // Parse report date from header line
-    var headerMatch=line.match(/Futures Daily Market Report for Cotton No 2\s+(\d{1,2})[-\/]([A-Za-z]{3})[-\/](\d{2,4})/i);
-    if(headerMatch){
-      var day=parseInt(headerMatch[1]);
-      var monthStr=headerMatch[2].toLowerCase();
-      var year=parseInt(headerMatch[3]);
-      if(year<50)year+=2000;else if(year<100)year+=1900;
-      if(MONTH_NAMES[monthStr]!==undefined){
-        reportDate=new Date(year,MONTH_NAMES[monthStr],day);
-      }
-    }
-    // Alternative date format
-    if(!reportDate){
-      var altDate=line.match(/^(\d{1,2})[-\/]([A-Za-z]{3})[-\/](\d{2,4})$/);
-      if(altDate){
-        var d=parseInt(altDate[1]),m=altDate[2].toLowerCase(),y=parseInt(altDate[3]);
-        if(y<50)y+=2000;else if(y<100)y+=1900;
-        if(MONTH_NAMES[m]!==undefined)reportDate=new Date(y,MONTH_NAMES[m],d);
-      }
-    }
-
-    // Parse ICE table format: CT Jul-26 78.64 79.76 77.66 79.38 79.45 0.81 43,745 164,817 -5,530 ...
-    var iceMatch=line.match(/^CT\s+([A-Z][a-z]{2}-\d{2})\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.-]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
-    if(iceMatch){
-      var contract=iceMatch[1];
-      var openP=parseFloat(iceMatch[2]);
-      var high=parseFloat(iceMatch[3]);
-      var low=parseFloat(iceMatch[4]);
-      var close=parseFloat(iceMatch[5]);
-      var settle=parseFloat(iceMatch[6]);
-      var priceChg=parseFloat(iceMatch[7]);
-      var volume=parseInt(iceMatch[8].replace(/,/g,''));
-      var oi=parseInt(iceMatch[9].replace(/,/g,''));
-      var oiChgStr=iceMatch[10].replace(/,/g,'');
-      var oiChg=parseInt(oiChgStr);
-      contracts[contract]={open:openP,high:high,low:low,close:close,settle:settle,priceChg:priceChg,volume:volume,oi:oi,oiChg:oiChg};
-    }
-
-    // Parse short format: CT Oct-26 80.84 0.64 3 54 1 0 0 0 3
-    var shortMatch=line.match(/^CT\s+([A-Z][a-z]{2}-\d{2})\s+([\d.]+)\s+([\d.-]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
-    if(shortMatch&&!contracts[shortMatch[1]]){
-      var contract=shortMatch[1];
-      var settle=parseFloat(shortMatch[2]);
-      var priceChg=parseFloat(shortMatch[3]);
-      var volume=parseInt(shortMatch[4].replace(/,/g,''));
-      var oi=parseInt(shortMatch[5].replace(/,/g,''));
-      var oiChg=parseInt(shortMatch[6].replace(/,/g,''));
-      contracts[contract]={open:null,high:null,low:null,close:null,settle:settle,priceChg:priceChg,volume:volume,oi:oi,oiChg:oiChg};
-    }
-
-    // Parse totals line
-    var totalsMatch=line.match(/Totals for CT:\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,+-]+)/);
-    if(totalsMatch){
-      totals={
-        volume:parseInt(totalsMatch[1].replace(/,/g,'')),
-        oi:parseInt(totalsMatch[2].replace(/,/g,'')),
-        oiChg:parseInt(totalsMatch[3].replace(/,/g,'').replace('+',''))
-      };
-    }
-  }
-
-  if(!reportDate){showStatus('pdfParseStatus','No date found. Include like "23-Apr-2026" in header','err');return;}
-  if(Object.keys(contracts).length===0){showStatus('pdfParseStatus','No contract data parsed. Check format.','err');return;}
-
-  // Determine front month using FND logic
-  var frontContract=getActiveContract(reportDate);
-  var frontCode=frontContract.replace(/\d$/,'');
-  var frontYear=reportDate.getFullYear();
-  var frontMonthNum=CONTRACT_MONTHS[frontCode];
-  var frontMonthName=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][frontMonthNum];
-  var frontKey=frontMonthName+'-'+(frontYear%100).toString().padStart(2,'0');
-
-  // Find front month data
-  var frontData=null;
-  for(var key in contracts){
-    if(key===frontKey||key.indexOf(frontMonthName)===0){frontData=contracts[key];break;}
-  }
-  if(!frontData){frontData=contracts[Object.keys(contracts)[0]];}
-
-  // Use totals if available, else sum from contracts
-  var combinedTotals=totals||{volume:0,oi:0,oiChg:0};
-  if(!combinedTotals.oi){
-    var sumOI=0,sumVol=0,sumOIChg=0;
-    for(var k in contracts){if(contracts[k].oi)sumOI+=contracts[k].oi;if(contracts[k].volume)sumVol+=contracts[k].volume;if(contracts[k].oiChg)sumOIChg+=contracts[k].oiChg;}
-    combinedTotals={volume:sumVol,oi:sumOI,oiChg:sumOIChg};
-  }
-
-  // Get last known COT for lag
-  var lastCot=mergedHistory.length>0?mergedHistory[0]:null;
-
-  // Build latest week data object
-  latestWeekData={
-    date:reportDate.toISOString().split('T')[0],
-    report_date:reportDate,
-    front_oi_level:frontData.oi,
-    front_oi_delta:frontData.oiChg,
-    comb_oi_level:combinedTotals.oi,
-    comb_oi_delta:combinedTotals.oiChg,
-    front_vol_avg:frontData.volume,
-    front_vol_delta:0,
-    front_velo:frontData.oi>0?frontData.volume/frontData.oi:0,
-    price_delta:frontData.priceChg,
-    price_level:frontData.settle,
-    price_vol_interact:frontData.priceChg*frontData.volume/1000,
-    mm_net_lag1:lastCot?lastCot.mm_net:null,
-    active_contract:frontContract,
-    all_contracts:contracts
-  };
-
-  showStatus('pdfParseStatus','Parsed: '+fmtDate(reportDate)+' | Front: '+frontContract+' | OI: '+frontData.oi+' | Vol: '+frontData.volume+' | Contracts: '+Object.keys(contracts).length,'ok');
-  renderPdfParsed(latestWeekData,contracts);
-  $('predictBtn').disabled=false;
-  $('compareBtn').disabled=false;
-}
-
-function renderPdfParsed(latest,contracts){
-  $('pdfParsedSection').style.display='block';
-
-  var sumHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
-  sumHtml+='<tr><td>Report Date</td><td class="num">'+fmtDate(latest.date)+'</td></tr>';
-  sumHtml+='<tr><td>Active Contract</td><td class="num">'+latest.active_contract+'</td></tr>';
-  sumHtml+='<tr><td>Front Month OI</td><td class="num">'+fmtNum(latest.front_oi_level,0)+'</td></tr>';
-  sumHtml+='<tr><td>Front OI Δ</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
-  sumHtml+='<tr><td>Combined OI</td><td class="num">'+fmtNum(latest.comb_oi_level,0)+'</td></tr>';
-  sumHtml+='<tr><td>Combined OI Δ</td><td class="num '+(latest.comb_oi_delta>=0?'pos':'neg')+'">'+(latest.comb_oi_delta>0?'+':'')+fmtNum(latest.comb_oi_delta,0)+'</td></tr>';
-  sumHtml+='<tr><td>Front Volume</td><td class="num">'+fmtNum(latest.front_vol_avg,0)+'</td></tr>';
-  sumHtml+='<tr><td>Volume/OI Ratio</td><td class="num">'+fmtNum(latest.front_velo,4)+'</td></tr>';
-  sumHtml+='<tr><td>Price Change</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
-  sumHtml+='<tr><td>Last Known MM Net</td><td class="num">'+fmtNum(latest.mm_net_lag1,0)+'</td></tr>';
-  sumHtml+='</tbody></table>';
-  $('pdfParsedSummary').innerHTML=sumHtml;
-
-  var contHtml='<table><thead><tr><th>Contract</th><th>Settle</th><th>Δ</th><th>Vol</th><th>OI</th><th>OI Δ</th></tr></thead><tbody>';
-  for(var k in contracts){
-    var c=contracts[k];
-    contHtml+='<tr><td>'+k+'</td><td class="num">'+fmtNum(c.settle,2)+'</td><td class="num '+(c.priceChg>=0?'pos':'neg')+'">'+(c.priceChg>0?'+':'')+fmtNum(c.priceChg,2)+'</td><td class="num">'+fmtNum(c.volume,0)+'</td><td class="num">'+fmtNum(c.oi,0)+'</td><td class="num '+(c.oiChg>=0?'pos':'neg')+'">'+(c.oiChg>0?'+':'')+fmtNum(c.oiChg,0)+'</td></tr>';
-  }
-  contHtml+='</tbody></table>';
-  $('pdfParsedContracts').innerHTML=contHtml;
-}
-
-function clearPdfInput(){
-  $('pdfTextInput').value='';
-  $('pdfParsedSection').style.display='none';
-  latestWeekData=null;
-  $('predictBtn').disabled=true;
-  $('compareBtn').disabled=true;
-}
-
-/* ===========================================================
    FETCH ACTUAL COT AND COMPARE
    =========================================================== */
 function fetchActualCotAndCompare(){
@@ -752,7 +762,6 @@ function fetchActualCotAndCompare(){
 
   showStatus('actionStatus','Fetching actual COT from CFTC API...','warn');
 
-  // Find the COT report date that corresponds to this PDF date
   var pdfDate=latestWeekData.report_date;
   var cotTuesday=new Date(pdfDate);
   var dayOfWeek=cotTuesday.getDay();
@@ -860,9 +869,7 @@ function renderComparisonChart(){
 
   for(var i=0;i<mergedHistory.length&&i<8;i++){
     var idx=mergedHistory.length-1-i;
-    if(idx>=0&&idx<mergedHistory.length){
-      predNet.push(mergedHistory[idx].mm_net);
-    }
+    if(idx>=0&&idx<mergedHistory.length){predNet.push(mergedHistory[idx].mm_net);}
   }
   if(latestWeekData&&bestModel){
     var currentPred=(latestWeekData.mm_net_lag1||0)+predictWithModel(bestModel,latestWeekData);
@@ -964,26 +971,20 @@ function trainModels(){
   var modelsList=[];
   var yNet=trainData.map(function(d){return d.mm_net_delta;});
 
-  // Model 1: OI only
   var f1=features.filter(function(f){return f.name.indexOf('OI')!==-1;});
   if(f1.length){var X1=buildX(trainData,f1);modelsList.push({name:'OI Only',target:'net',features:getNames(f1),model:olsRegression(yNet,X1,getNames(f1))});}
 
-  // Model 2: OI + Price
   var f2=features.filter(function(f){return f.name.indexOf('OI')!==-1||f.name==='Price Δ';});
   var X2=buildX(trainData,f2);modelsList.push({name:'OI + Price',target:'net',features:getNames(f2),model:olsRegression(yNet,X2,getNames(f2))});
 
-  // Model 3: OI + Vol + Price
   var f3=features.filter(function(f){return f.name!=='MM Net Lag1';});
   var X3=buildX(trainData,f3);modelsList.push({name:'OI + Vol + Price',target:'net',features:getNames(f3),model:olsRegression(yNet,X3,getNames(f3))});
 
-  // Model 4: Full
   var X4=buildX(trainData,features);modelsList.push({name:'Full Model',target:'net',features:getNames(features),model:olsRegression(yNet,X4,getNames(features))});
 
-  // Model 5: Velocity
   var f5=features.filter(function(f){return f.name.indexOf('Velo')!==-1||f.name==='Price Δ'||f.name==='MM Net Lag1';});
   if(f5.length>=2){var X5=buildX(trainData,f5);modelsList.push({name:'Velocity Model',target:'net',features:getNames(f5),model:olsRegression(yNet,X5,getNames(f5))});}
 
-  // Model 6: Smoothed
   var X6=trainData.map(function(d,i){
     var prev=i>0?trainData[i-1]:d;
     return [
@@ -1015,18 +1016,9 @@ function predictWithModel(model,dataPoint){
     else if(fn==='Price*Vol')featVec.push(dataPoint.price_vol_interact||0);
     else if(fn==='Price Δ')featVec.push(dataPoint.price_delta||0);
     else if(fn==='MM Net Lag1')featVec.push(dataPoint.mm_net_lag1||0);
-    else if(fn==='Front OI(s)'){
-      var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;
-      featVec.push((prev.front_oi_delta||0)*0.5+(dataPoint.front_oi_delta||0)*0.5);
-    }
-    else if(fn==='Comb OI(s)'){
-      var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;
-      featVec.push((prev.comb_oi_delta||0)*0.5+(dataPoint.comb_oi_delta||0)*0.5);
-    }
-    else if(fn==='Vol(s)'){
-      var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;
-      featVec.push((prev.front_vol_avg||0)*0.5+(dataPoint.front_vol_avg||0)*0.5);
-    }
+    else if(fn==='Front OI(s)'){var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;featVec.push((prev.front_oi_delta||0)*0.5+(dataPoint.front_oi_delta||0)*0.5);}
+    else if(fn==='Comb OI(s)'){var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;featVec.push((prev.comb_oi_delta||0)*0.5+(dataPoint.comb_oi_delta||0)*0.5);}
+    else if(fn==='Vol(s)'){var prev=mergedHistory.length>0?mergedHistory[0]:dataPoint;featVec.push((prev.front_vol_avg||0)*0.5+(dataPoint.front_vol_avg||0)*0.5);}
     else featVec.push(0);
   });
   var pred=model.model.beta[0];
@@ -1175,10 +1167,6 @@ function switchTab(id){
   event.target.classList.add('active');$(id).classList.add('active');
 }
 
-function downloadResultsCsv(){
-  alert('Download feature: export backtest results to CSV');
-}
-
 /* ===========================================================
    DEBUG
    =========================================================== */
@@ -1190,7 +1178,6 @@ function renderDebug(){
   if(cotHistory.length)$('debugCot').textContent=JSON.stringify(cotHistory.slice(0,5),null,2);
 }
 
-// Auto-render debug when data loads
 $('cotHistoryInput').addEventListener('input',function(){if(this.value.trim())parseCotHistory();});
 </script>
 
