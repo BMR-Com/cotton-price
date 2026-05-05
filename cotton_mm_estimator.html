@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotton MM Position Estimator — OI Regression</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root{--bg:#f5f7fa;--card:#fff;--txt:#1a1a2e;--acc:#2a5298;--acc2:#1a8c4e;--warn:#d4880f;--err:#c0392b;--border:#dde1e7;--font:'Segoe UI',system-ui,sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);background:var(--bg);color:var(--txt);line-height:1.45;padding:20px;}
+  h1{font-size:1.35rem;color:var(--acc);margin-bottom:4px;border-bottom:2px solid var(--acc);padding-bottom:6px;}
+  h2{font-size:1.05rem;color:var(--txt);margin:18px 0 8px;border-left:4px solid var(--acc);padding-left:8px;}
+  h3{font-size:0.92rem;color:#555;margin:12px 0 6px;}
+  .subtitle{font-size:0.82rem;color:#666;margin-bottom:16px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:16px;}
+  .card{background:var(--card);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:14px;border:1px solid var(--border);}
+  .card-full{grid-column:1/-1;}
+  label{display:block;font-size:0.78rem;color:#555;margin-bottom:3px;font-weight:600;}
+  input,select,button{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;font-family:inherit;}
+  input:focus,select:focus{outline:none;border-color:var(--acc);}
+  button{background:var(--acc);color:#fff;border:none;cursor:pointer;font-weight:600;transition:opacity .2s;}
+  button:hover{opacity:.88;}
+  button:disabled{background:#999;cursor:not-allowed;}
+  .btn-sm{width:auto;padding:5px 12px;font-size:0.75rem;}
+  .btn-sec{background:var(--acc2);}
+  .btn-warn{background:var(--warn);}
+  .flex{display:flex;gap:10px;align-items:flex-end;}
+  .flex>div{flex:1;}
+  .status{font-size:0.78rem;padding:8px 12px;border-radius:5px;margin-top:10px;display:none;}
+  .status.ok{background:#d4edda;color:#155724;border:1px solid #c3e6cb;}
+  .status.err{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;}
+  .status.warn{background:#fff3cd;color:#856404;border:1px solid #ffeaa7;}
+  table{width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:8px;}
+  th,td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--border);}
+  th{background:#f8f9fa;font-weight:600;text-align:right;font-size:0.72rem;color:#555;position:sticky;top:0;}
+  td:first-child,th:first-child{text-align:left;}
+  tr:hover td{background:#f8f9fa;}
+  .num{font-variant-numeric:tabular-nums;}
+  .pos{color:var(--acc2);font-weight:600;}
+  .neg{color:var(--err);font-weight:600;}
+  .chart-wrap{position:relative;height:260px;margin-top:10px;}
+  .chart-wrap-lg{height:340px;}
+  .metric{display:inline-block;padding:3px 10px;border-radius:4px;background:#eef2f7;font-size:0.75rem;margin:2px;}
+  .metric strong{color:var(--acc);}
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:12px;}
+  .tab{padding:7px 14px;font-size:0.8rem;cursor:pointer;border-radius:4px 4px 0 0;background:#f0f2f5;color:#555;font-weight:600;}
+  .tab.active{background:var(--acc);color:#fff;}
+  .tab-body{display:none;}
+  .tab-body.active{display:block;}
+  .small{font-size:0.72rem;color:#777;}
+  .scroll{max-height:320px;overflow:auto;}
+  .highlight{background:#fff9e6;border-left:3px solid var(--warn);padding:8px 12px;font-size:0.8rem;margin:8px 0;border-radius:0 4px 4px 0;}
+  .model-card{border:1px solid var(--border);border-radius:6px;padding:10px;margin:6px 0;background:#fafbfc;}
+  .model-title{font-weight:700;color:var(--acc);font-size:0.85rem;}
+  .model-stat{display:inline-block;margin:3px 8px 3px 0;font-size:0.75rem;}
+  .best{background:#d4edda;border-color:#1a8c4e;}
+  .pred-box{background:var(--card);border:2px solid var(--acc);border-radius:8px;padding:14px;margin:10px 0;text-align:center;}
+  .pred-big{font-size:2rem;font-weight:700;color:var(--acc);}
+  .pred-label{font-size:0.8rem;color:#666;margin-top:4px;}
+  .fnd-info{background:#e8f4fd;border:1px solid #bee5eb;border-radius:5px;padding:8px 12px;font-size:0.75rem;margin:6px 0;}
+  @media(max-width:600px){.grid{grid-template-columns:1fr;}.flex{flex-direction:column;}.flex>div{width:100%;}}
+</style>
+</head>
+<body>
+
+<h1>🎯 Cotton Managed Money Position Estimator</h1>
+<p class="subtitle">Predict COT Managed Money Net Position changes from daily Open Interest movements | FND computed purely from exchange logic | Regression models: Front Month OI vs Combined OI</p>
+
+<div class="grid">
+  <div class="card">
+    <h2>📁 Data Sources</h2>
+    <div class="flex">
+      <div>
+        <label>Cotton OI CSV URL (only file needed)</label>
+        <input type="text" id="oiUrl" value="data/cotton_raw.csv" placeholder="data/cotton_raw.csv">
+      </div>
+    </div>
+    <div class="fnd-info">
+      <strong>FND Logic:</strong> ICE Cotton No. 2 — First Notice Day = 5 business days before the 1st business day of the delivery month. 
+      Front month auto-detected from OI data using contract month codes (MAR, MAY, JUL, OCT, DEC).
+    </div>
+    <div class="flex" style="margin-top:8px;">
+      <div>
+        <label>COT Data Source</label>
+        <select id="cotSource">
+          <option value="api">Fetch from CFTC API (live)</option>
+          <option value="csv">Load local CSV</option>
+        </select>
+      </div>
+      <div id="cotCsvDiv" style="display:none;">
+        <label>COT CSV URL</label>
+        <input type="text" id="cotCsvUrl" value="data/cot_cotton.csv" placeholder="data/cot_cotton.csv">
+      </div>
+    </div>
+    <div style="margin-top:10px;">
+      <button onclick="loadAllData()">🔄 Load Data & Run Regression</button>
+      <button class="btn-sm btn-sec" onclick="downloadMergedCsv()" id="dlBtn" style="display:none;">⬇ Download Merged CSV</button>
+    </div>
+    <div id="loadStatus" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Model Settings</h2>
+    <div class="flex">
+      <div>
+        <label>Lookback Window (weeks)</label>
+        <input type="number" id="lookback" value="52" min="12" max="260">
+      </div>
+      <div>
+        <label>Min R² to Show Prediction</label>
+        <input type="number" id="minR2" value="0.15" min="0" max="1" step="0.05">
+      </div>
+    </div>
+    <div class="flex" style="margin-top:8px;">
+      <div>
+        <label>OI Aggregation</label>
+        <select id="oiAgg">
+          <option value="both">Both: Front Month + Combined</option>
+          <option value="front">Front Month Only</option>
+          <option value="combined">Combined All Months</option>
+        </select>
+      </div>
+      <div>
+        <label>Target</label>
+        <select id="targetVar">
+          <option value="net">Δ Net Position (contracts)</option>
+          <option value="net_pct">Δ Net % of OI</option>
+          <option value="long">Δ Long Only</option>
+          <option value="short">Δ Short Only</option>
+        </select>
+      </div>
+    </div>
+    <div class="small" style="margin-top:8px;">
+      COT reports released Friday for Tuesday positions. OI changes Mon–Fri predict next COT.
+      Front month determined by FND: MAR→MAY→JUL→OCT→DEC cycle.
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('tab-pred')">🔮 Current Estimate</div>
+  <div class="tab" onclick="switchTab('tab-models')">📊 Model Comparison</div>
+  <div class="tab" onclick="switchTab('tab-hist')">📈 Historical Accuracy</div>
+  <div class="tab" onclick="switchTab('tab-data')">📋 Data Table</div>
+  <div class="tab" onclick="switchTab('tab-debug')">🔧 Debug</div>
+</div>
+
+<div id="tab-pred" class="tab-body active">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>🔮 Latest Managed Money Net Position Estimate</h2>
+      <div id="predLoading" style="text-align:center;padding:30px;color:#999;">Load data to generate estimate</div>
+      <div id="predContent" style="display:none;">
+        <div class="highlight">
+          <strong>Methodology:</strong> Daily OI changes (Mon–Fri) are aggregated into weekly changes aligned with COT report dates (Tuesday positions). 
+          FND is computed from ICE exchange rules: 5 business days before the 1st business day of delivery month. 
+          Multiple regression models are trained on historical data and the best-performing model generates the estimate.
+        </div>
+        <div class="grid" style="margin-top:10px;">
+          <div class="card pred-box">
+            <div class="pred-label">Estimated MM Net Position Change</div>
+            <div class="pred-big" id="predDelta">—</div>
+            <div class="pred-label" id="predContext">contracts vs last COT</div>
+          </div>
+          <div class="card pred-box" style="border-color:var(--acc2);">
+            <div class="pred-label">Estimated MM Net Position (Level)</div>
+            <div class="pred-big" id="predLevel" style="color:var(--acc2);">—</div>
+            <div class="pred-label" id="predLevelContext">contracts</div>
+          </div>
+          <div class="card pred-box" style="border-color:var(--warn);">
+            <div class="pred-label">Model Confidence (R²)</div>
+            <div class="pred-big" id="predR2" style="color:var(--warn);font-size:1.6rem;">—</div>
+            <div class="pred-label" id="predModelName">Best model</div>
+          </div>
+        </div>
+
+        <h3>Active Contract & FND Info</h3>
+        <div id="fndInfo" class="fnd-info"></div>
+
+        <h3>Weekly OI Breakdown (Current Week)</h3>
+        <div id="oiBreakdown"></div>
+
+        <h3>Model Comparison for Current Week</h3>
+        <div id="modelCompare"></div>
+
+        <h3>Input Features (This Week vs Last Week)</h3>
+        <table>
+          <thead><tr><th>Feature</th><th>This Week</th><th>Last Week</th><th>Δ</th></tr></thead>
+          <tbody id="featTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-models" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>📊 Regression Model Performance Comparison</h2>
+      <div id="modelsLoading" style="text-align:center;padding:30px;color:#999;">Load data to compare models</div>
+      <div id="modelsContent" style="display:none;">
+        <div class="chart-wrap chart-wrap-lg">
+          <canvas id="modelChart"></canvas>
+        </div>
+        <div id="modelCards"></div>
+
+        <h3>Coefficient Analysis (Best Model)</h3>
+        <div class="chart-wrap">
+          <canvas id="coefChart"></canvas>
+        </div>
+
+        <h3>Residual Analysis (Best Model)</h3>
+        <div class="chart-wrap">
+          <canvas id="residChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-hist" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>📈 Historical Prediction Accuracy</h2>
+      <div id="histLoading" style="text-align:center;padding:30px;color:#999;">Load data to view accuracy</div>
+      <div id="histContent" style="display:none;">
+        <div class="chart-wrap chart-wrap-lg">
+          <canvas id="histChart"></canvas>
+        </div>
+        <div class="chart-wrap chart-wrap-lg" style="margin-top:15px;">
+          <canvas id="accuracyChart"></canvas>
+        </div>
+        <h3>Directional Accuracy by Model</h3>
+        <table>
+          <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>MAE</th><th>Directional Acc %</th><th>n</th></tr></thead>
+          <tbody id="accTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-data" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>📋 Merged Weekly Data (COT + OI)</h2>
+      <div id="dataLoading" style="text-align:center;padding:30px;color:#999;">Load data to view table</div>
+      <div id="dataContent" style="display:none;" class="scroll">
+        <table>
+          <thead id="dataHead"></thead>
+          <tbody id="dataBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-debug" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>🔧 Debug Information</h2>
+      <div id="debugLoading" style="text-align:center;padding:30px;color:#999;">Load data to view debug info</div>
+      <div id="debugContent" style="display:none;">
+        <h3>Data Load Summary</h3>
+        <div id="debugSummary"></div>
+        <h3>FND Computations (Sample)</h3>
+        <pre id="debugFnd" style="background:#f5f5f5;padding:10px;font-size:0.75rem;overflow:auto;max-height:200px;"></pre>
+        <h3>Available Fields (COT Sample)</h3>
+        <pre id="debugCotFields" style="background:#f5f5f5;padding:10px;font-size:0.75rem;overflow:auto;max-height:200px;"></pre>
+        <h3>OI Data Sample</h3>
+        <pre id="debugOiSample" style="background:#f5f5f5;padding:10px;font-size:0.75rem;overflow:auto;max-height:200px;"></pre>
+        <h3>Regression Diagnostics</h3>
+        <pre id="debugReg" style="background:#f5f5f5;padding:10px;font-size:0.75rem;overflow:auto;max-height:300px;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================================================
+   CONSTANTS & CONFIG
+   =========================================================== */
+const COT_API = 'https://publicreporting.cftc.gov/resource/kh3c-gbw2.json';
+const COT_COMM = "COTTON NO. 2 - ICE FUTURES U.S.";
+
+const CONTRACT_MONTHS = {CTMAR:2, CTMAY:4, CTJUL:6, CTOCT:9, CTDEC:11};
+const CONTRACT_ORDER = ['CTMAR','CTMAY','CTJUL','CTOCT','CTDEC'];
+const CONTRACT_CODES = {CTMAR:'H',CTMAY:'K',CTJUL:'N',CTOCT:'V',CTDEC:'Z'};
+const CONTRACT_PREFIXES = ['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
+
+/* ===========================================================
+   STATE
+   =========================================================== */
+var oiData = [], cotData = [], mergedData = [], models = {}, bestModel = null, charts = {};
+
+/* ===========================================================
+   UTILITIES
+   =========================================================== */
+function $(id){return document.getElementById(id);}
+function showStatus(id,msg,type){var el=$(id);el.textContent=msg;el.className='status '+type;el.style.display='block';}
+function hideStatus(id){$(id).style.display='none';}
+
+function parseDate(d){
+  if(!d)return null;
+  if(d instanceof Date)return d;
+  var mdy = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(mdy){var y=parseInt(mdy[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(mdy[1])-1,parseInt(mdy[2]));}
+  var md2 = d.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if(md2){var y=parseInt(md2[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(md2[1])-1,parseInt(md2[2]));}
+  var iso=new Date(d);if(!isNaN(iso))return iso;
+  return null;
+}
+
+function fmtDate(d){if(!d)return'';var dt=parseDate(d);if(!dt)return'';return dt.toISOString().split('T')[0];}
+function fmtNum(n,d){if(n==null||isNaN(n))return'—';return n.toFixed(d!==undefined?d:0);}
+function fmtPct(n){if(n==null||isNaN(n))return'—';return(n*100).toFixed(1)+'%';}
+
+function parseCSV(text){
+  var lines=text.trim().split(/\r?\n/);if(!lines.length)return[];
+  var headers=lines[0].split(',').map(function(h){return h.trim().replace(/^"|"$/g,'');});
+  var out=[];
+  for(var i=1;i<lines.length;i++){
+    var line=lines[i];if(!line.trim())continue;
+    var vals=[],cur='',inQ=false;
+    for(var j=0;j<line.length;j++){var c=line[j];if(c==='"'){inQ=!inQ;continue;}if(c===','&&!inQ){vals.push(cur.trim());cur='';continue;}cur+=c;}
+    vals.push(cur.trim());
+    var obj={};
+    for(var k=0;k<headers.length;k++){var v=vals[k]||'';if(v==='#N/A N/A'||v==='#N/A'||v==='')v=null;else if(!isNaN(parseFloat(v))&&v!=='')v=parseFloat(v);obj[headers[k]]=v;}
+    out.push(obj);
+  }
+  return out;
+}
+
+function fetchText(url,timeout){
+  timeout=timeout||20000;
+  return new Promise(function(res,rej){
+    var ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+    var tid=setTimeout(function(){if(ctrl)ctrl.abort();rej(new Error('Timeout'));},timeout);
+    fetch(url,ctrl?{signal:ctrl.signal}:{}).then(function(r){clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}).then(function(t){res(t);}).catch(function(e){clearTimeout(tid);rej(e);});
+  });
+}
+
+/* ===========================================================
+   FND LOGIC — Pure algorithmic, no CSV needed
+   ICE Cotton No. 2: FND = 5 business days before 1st business day of delivery month
+   =========================================================== */
+function isWeekend(d){var day=d.getDay();return day===0||day===6;}
+
+function isHoliday(d){
+  var y=d.getFullYear(),m=d.getMonth(),date=d.getDate();
+  if(m===0&&date===1)return true;
+  if(m===0&&date===2&&new Date(y,0,1).getDay()===0)return true;
+  if(m===0&&date>=15&&date<=21&&d.getDay()===1)return true;
+  if(m===1&&date>=15&&date<=21&&d.getDay()===1)return true;
+  if(m===4&&date>=25&&d.getDay()===1)return true;
+  if(m===5&&date===19)return true;
+  if(m===5&&date===20&&new Date(y,5,19).getDay()===0)return true;
+  if(m===6&&date===4)return true;
+  if(m===6&&date===5&&new Date(y,6,4).getDay()===0)return true;
+  if(m===8&&date<=7&&d.getDay()===1)return true;
+  if(m===10&&date>=22&&date<=28&&d.getDay()===4)return true;
+  if(m===11&&date===25)return true;
+  if(m===11&&date===26&&new Date(y,11,25).getDay()===0)return true;
+  return false;
+}
+
+function subtractBusinessDays(startDate,days){
+  var d=new Date(startDate);var subbed=0;
+  while(subbed<days){d.setDate(d.getDate()-1);if(!isWeekend(d)&&!isHoliday(d))subbed++;}
+  return d;
+}
+
+function getFirstBusinessDayOfMonth(year,month){
+  var d=new Date(year,month,1);
+  while(isWeekend(d)||isHoliday(d)){d.setDate(d.getDate()+1);}
+  return d;
+}
+
+function computeFND(year,month){
+  var firstBiz=getFirstBusinessDayOfMonth(year,month);
+  return subtractBusinessDays(firstBiz,5);
+}
+
+function getActiveContract(date){
+  var d=parseDate(date);if(!d)return'CTMAR1';
+  var y=d.getFullYear(),m=d.getMonth();
+  var fnds=[];
+  for(var i=0;i<CONTRACT_ORDER.length;i++){
+    var code=CONTRACT_ORDER[i],month=CONTRACT_MONTHS[code];
+    var fndThis=computeFND(y,month);if(d<=fndThis)fnds.push({code:code,year:y,fnd:fndThis});
+    var fndNext=computeFND(y+1,month);if(d<=fndNext)fnds.push({code:code,year:y+1,fnd:fndNext});
+  }
+  fnds.sort(function(a,b){return a.fnd-b.fnd;});
+  for(var i=0;i<fnds.length;i++){
+    if(d<=fnds[i].fnd){
+      var currentYear=new Date().getFullYear();
+      var suffix=(fnds[i].year<=currentYear+1)?'1':'2';
+      return fnds[i].code+suffix;
+    }
+  }
+  return'CTMAR1';
+}
+
+function getFrontMonthOI(row,date){
+  var active=getActiveContract(date);
+  var col=active+' Comdty OPEN_INT';
+  var val=row[col];
+  return(val!=null&&!isNaN(val))?val:null;
+}
+
+function getCombinedOI(row){
+  var sum=0,count=0;
+  for(var i=0;i<CONTRACT_PREFIXES.length;i++){
+    var col=CONTRACT_PREFIXES[i]+' Comdty OPEN_INT';
+    var val=row[col];
+    if(val!=null&&!isNaN(val)){sum+=val;count++;}
+  }
+  return count>0?sum:null;
+}
+
+function getActiveContractInfo(date){
+  var d=parseDate(date);if(!d)return null;
+  var active=getActiveContract(date);
+  var monthCode=active.replace(/\d$/,'');
+  var month=CONTRACT_MONTHS[monthCode];
+  var year=d.getFullYear();
+  var fnd=computeFND(year,month);
+  if(d>fnd){year++;fnd=computeFND(year,month);}
+  return{contract:active,monthName:monthCode.replace('CT',''),year:year,fnd:fnd,daysToFND:Math.round((fnd-d)/(1000*60*60*24))};
+}
+
+/* ===========================================================
+   COT DATA FETCHING
+   =========================================================== */
+function fetchCOTFromAPI(){
+  var url=COT_API+"?$where=market_and_exchange_names='"+COT_COMM.replace(/'/g,"''")+"'&$order=report_date_as_yyyy_mm_dd+ASC&$limit=10000";
+  return fetchText(url,30000).then(function(text){
+    var data=JSON.parse(text);if(!Array.isArray(data))throw new Error('Invalid API response');
+    return data.map(function(d){
+      var out={date:d.report_date_as_yyyy_mm_dd};
+      out.mm_long=si(d.m_money_positions_long_all);out.mm_short=si(d.m_money_positions_short_all);
+      out.mm_spread=si(d.m_money_positions_spread);out.mm_net=out.mm_long-out.mm_short;
+      out.oi_all=si(d.open_interest_all);out.oi_old=si(d.open_interest_old);out.oi_other=si(d.open_interest_other);
+      return out;
+    });
+  });
+}
+
+function loadCOTFromCSV(url){
+  return fetchText(url).then(function(text){
+    var data=parseCSV(text);
+    return data.map(function(d){
+      return{
+        date:d.Date||d.date||d.report_date_as_yyyy_mm_dd,
+        mm_long:si(d.mm_long||d.m_money_positions_long_all||d.Managed_Money_Long),
+        mm_short:si(d.mm_short||d.m_money_positions_short_all||d.Managed_Money_Short),
+        mm_spread:si(d.mm_spread||d.m_money_positions_spread||d.Managed_Money_Spread),
+        mm_net:si(d.mm_net||d.Managed_Money_Net),
+        oi_all:si(d.oi_all||d.open_interest_all||d.Open_Interest),
+        oi_old:si(d.oi_old||d.open_interest_old),oi_other:si(d.oi_other||d.open_interest_other)
+      };
+    }).filter(function(d){return d.date&&d.mm_net!=null;});
+  });
+}
+
+function si(v){return(v==null||v===''||v==='#N/A N/A')?0:(parseInt(v)||0);}
+
+/* ===========================================================
+   DATA ALIGNMENT: Daily OI -> Weekly (COT Tuesday alignment)
+   =========================================================== */
+function alignWeekly(){
+  if(!oiData.length||!cotData.length)return[];
+  var out=[];
+  for(var i=0;i<cotData.length;i++){
+    var cot=cotData[i],cotDate=parseDate(cot.date);if(!cotDate)continue;
+    var prevCot=i>0?cotData[i-1]:null;
+    var weekStart=new Date(cotDate);weekStart.setDate(weekStart.getDate()-7);
+    var weekOi=oiData.filter(function(r){var d=parseDate(r.Dates);if(!d)return false;return d>=weekStart&&d<=cotDate;});
+    if(weekOi.length<2)continue;
+    var first=weekOi[0],last=weekOi[weekOi.length-1];
+    var firstDate=parseDate(first.Dates),lastDate=parseDate(last.Dates);
+    var frontStart=getFrontMonthOI(first,first.Dates),frontEnd=getFrontMonthOI(last,last.Dates);
+    var frontDelta=(frontStart!=null&&frontEnd!=null)?frontEnd-frontStart:null;
+    var combStart=getCombinedOI(first),combEnd=getCombinedOI(last);
+    var combDelta=(combStart!=null&&combEnd!=null)?combEnd-combStart:null;
+    var frontVals=weekOi.map(function(r){return getFrontMonthOI(r,r.Dates);}).filter(function(v){return v!=null;});
+    var combVals=weekOi.map(function(r){return getCombinedOI(r);}).filter(function(v){return v!=null;});
+    var frontStd=std(frontVals),combStd=std(combVals);
+    var active=getActiveContract(cot.date),priceCol=active+' Comdty PX_LAST';
+    var priceStart=first[priceCol],priceEnd=last[priceCol];
+    var priceDelta=(priceStart!=null&&priceEnd!=null)?priceEnd-priceStart:null;
+    var mmNetLag1=prevCot?prevCot.mm_net:null,mmNetLag2=(i>1)?cotData[i-2].mm_net:null;
+    out.push({
+      date:cot.date,cotDate:fmtDate(cotDate),mm_net:cot.mm_net,mm_long:cot.mm_long,mm_short:cot.mm_short,
+      mm_net_delta:prevCot?(cot.mm_net-prevCot.mm_net):null,mm_long_delta:prevCot?(cot.mm_long-prevCot.mm_long):null,mm_short_delta:prevCot?(cot.mm_short-prevCot.mm_short):null,
+      oi_all:cot.oi_all,front_oi_delta:frontDelta,comb_oi_delta:combDelta,front_oi_level:frontEnd,comb_oi_level:combEnd,
+      front_oi_std:frontStd,comb_oi_std:combStd,price_delta:priceDelta,price_level:priceEnd,
+      mm_net_lag1:mmNetLag1,mm_net_lag2:mmNetLag2,days:weekOi.length,active_contract:active
+    });
+  }
+  return out;
+}
+
+function std(arr){if(!arr||arr.length<2)return 0;var mean=arr.reduce(function(a,b){return a+b;},0)/arr.length;var sq=arr.map(function(v){return Math.pow(v-mean,2);});return Math.sqrt(sq.reduce(function(a,b){return a+b;},0)/(arr.length-1));}
+
+/* ===========================================================
+   REGRESSION ENGINE (OLS from scratch in JS)
+   =========================================================== */
+function olsRegression(y,X,names){
+  var n=y.length,k=X[0].length;
+  var Xb=X.map(function(row){return[1].concat(row);});
+  var xtx=zeros(k+1,k+1);
+  for(var i=0;i<k+1;i++){for(var j=0;j<k+1;j++){var sum=0;for(var r=0;r<n;r++)sum+=Xb[r][i]*Xb[r][j];xtx[i][j]=sum;}}
+  var xty=zeros(k+1,1);
+  for(var i=0;i<k+1;i++){var sum=0;for(var r=0;r<n;r++)sum+=Xb[r][i]*y[r];xty[i][0]=sum;}
+  var beta=solveLinear(xtx,xty);
+  var pred=Xb.map(function(row){var sum=0;for(var i=0;i<row.length;i++)sum+=row[i]*beta[i];return sum;});
+  var yMean=y.reduce(function(a,b){return a+b;},0)/n;
+  var ssTot=y.reduce(function(a,b){return a+Math.pow(b-yMean,2);},0);
+  var ssRes=y.reduce(function(a,b,i){return a+Math.pow(y[i]-pred[i],2);},0);
+  var r2=ssTot>0?1-ssRes/ssTot:0;
+  var rmse=Math.sqrt(ssRes/n),mae=y.reduce(function(a,b,i){return a+Math.abs(y[i]-pred[i]);},0)/n;
+  var dirCorrect=0,dirTotal=0;
+  for(var i=1;i<n;i++){var actualDir=y[i]-y[i-1],predDir=pred[i]-pred[i-1];if(actualDir!==0){dirTotal++;if((actualDir>0&&predDir>0)||(actualDir<0&&predDir<0))dirCorrect++;}}
+  var dirAcc=dirTotal>0?dirCorrect/dirTotal:0;
+  return{beta:beta,names:['intercept'].concat(names),r2:r2,rmse:rmse,mae:mae,dirAcc:dirAcc,n:n,pred:pred,resid:y.map(function(v,i){return v-pred[i];})};
+}
+
+function zeros(rows,cols){var out=[];for(var i=0;i<rows;i++){out.push(new Array(cols).fill(0));}return out;}
+
+function solveLinear(A,b){
+  var n=A.length,aug=[];
+  for(var i=0;i<n;i++){aug.push(A[i].concat([b[i][0]]));}
+  for(var i=0;i<n;i++){
+    var maxRow=i;for(var r=i+1;r<n;r++){if(Math.abs(aug[r][i])>Math.abs(aug[maxRow][i]))maxRow=r;}
+    var tmp=aug[i];aug[i]=aug[maxRow];aug[maxRow]=tmp;
+    if(Math.abs(aug[i][i])<1e-12)continue;
+    for(var r=i+1;r<n;r++){var factor=aug[r][i]/aug[i][i];for(var c=i;c<=n;c++)aug[r][c]-=factor*aug[i][c];}
+  }
+  var x=new Array(n).fill(0);
+  for(var i=n-1;i>=0;i--){
+    if(Math.abs(aug[i][i])<1e-12){x[i]=0;continue;}
+    x[i]=aug[i][n];for(var c=i+1;c<n;c++)x[i]-=aug[i][c]*x[c];x[i]/=aug[i][i];
+  }
+  return x;
+}
+
+/* ===========================================================
+   MODEL BUILDING
+   =========================================================== */
+function buildModels(){
+  var data=mergedData.filter(function(d){return d.mm_net_delta!=null;});
+  var lookback=parseInt($('lookback').value)||52;
+  var targetType=$('targetVar').value;
+  if(data.length>lookback)data=data.slice(-lookback);
+  var y=data.map(function(d){if(targetType==='net')return d.mm_net_delta;if(targetType==='net_pct')return d.oi_all>0?(d.mm_net/d.oi_all*100):0;if(targetType==='long')return d.mm_long_delta;if(targetType==='short')return d.mm_short_delta;return d.mm_net_delta;});
+  var validIdx=[];for(var i=0;i<y.length;i++)if(y[i]!=null&&!isNaN(y[i]))validIdx.push(i);
+  y=validIdx.map(function(i){return y[i];});var trainData=validIdx.map(function(i){return data[i];});
+  if(y.length<10)return null;
+  var models=[];
+  var X1=trainData.map(function(d){return[d.front_oi_delta||0];});
+  models.push({name:'Front Month OI Δ',features:['Front OI Δ'],model:olsRegression(y,X1,['Front OI Δ'])});
+  var X2=trainData.map(function(d){return[d.comb_oi_delta||0];});
+  models.push({name:'Combined OI Δ',features:['Combined OI Δ'],model:olsRegression(y,X2,['Combined OI Δ'])});
+  var X3=trainData.map(function(d){return[d.front_oi_delta||0,d.comb_oi_delta||0];});
+  models.push({name:'Front + Combined OI Δ',features:['Front OI Δ','Combined OI Δ'],model:olsRegression(y,X3,['Front OI Δ','Combined OI Δ'])});
+  var X4=trainData.map(function(d){return[d.front_oi_delta||0,d.price_delta||0];});
+  models.push({name:'Front OI Δ + Price Δ',features:['Front OI Δ','Price Δ'],model:olsRegression(y,X4,['Front OI Δ','Price Δ'])});
+  var X5=trainData.map(function(d){return[d.comb_oi_delta||0,d.price_delta||0];});
+  models.push({name:'Combined OI Δ + Price Δ',features:['Combined OI Δ','Price Δ'],model:olsRegression(y,X5,['Combined OI Δ','Price Δ'])});
+  var X6=trainData.map(function(d){return[d.front_oi_delta||0,d.comb_oi_delta||0,d.price_delta||0,d.mm_net_lag1||0];});
+  models.push({name:'Full Model (All Features)',features:['Front OI Δ','Combined OI Δ','Price Δ','MM Net Lag1'],model:olsRegression(y,X6,['Front OI Δ','Combined OI Δ','Price Δ','MM Net Lag1'])});
+  var X7=trainData.map(function(d,i){var frontSmooth=i>0?(trainData[i-1].front_oi_delta||0)*0.5+(d.front_oi_delta||0)*0.5:(d.front_oi_delta||0);var combSmooth=i>0?(trainData[i-1].comb_oi_delta||0)*0.5+(d.comb_oi_delta||0)*0.5:(d.comb_oi_delta||0);return[frontSmooth,combSmooth];});
+  models.push({name:'Smoothed OI Δ (EWMA)',features:['Front OI Δ (smooth)','Combined OI Δ (smooth)'],model:olsRegression(y,X7,['Front OI Δ (smooth)','Combined OI Δ (smooth)'])});
+  return{models:models,data:trainData,y:y};
+}
+
+function predictLatest(modelResult){
+  if(!modelResult||!modelResult.models.length)return null;
+  var best=modelResult.models[0];for(var i=1;i<modelResult.models.length;i++){if(modelResult.models[i].model.r2>best.model.r2)best=modelResult.models[i];}
+  var latest=mergedData[mergedData.length-1];if(!latest)return null;
+  var features=[];
+  if(best.name.indexOf('Front')!==-1&&best.name.indexOf('Combined')===-1){features=[latest.front_oi_delta||0];}
+  else if(best.name.indexOf('Combined')!==-1&&best.name.indexOf('Front')===-1){features=[latest.comb_oi_delta||0];}
+  else if(best.name.indexOf('Full')!==-1){features=[latest.front_oi_delta||0,latest.comb_oi_delta||0,latest.price_delta||0,latest.mm_net_lag1||0];}
+  else if(best.name.indexOf('Smoothed')!==-1){var prev=mergedData.length>1?mergedData[mergedData.length-2]:latest;var fSmooth=(prev.front_oi_delta||0)*0.5+(latest.front_oi_delta||0)*0.5;var cSmooth=(prev.comb_oi_delta||0)*0.5+(latest.comb_oi_delta||0)*0.5;features=[fSmooth,cSmooth];}
+  else{features=[latest.front_oi_delta||0,latest.comb_oi_delta||0];}
+  if(best.features.indexOf('Price Δ')!==-1&&features.length<best.features.length){features.push(latest.price_delta||0);}
+  var pred=best.model.beta[0];for(var i=0;i<features.length;i++){pred+=best.model.beta[i+1]*features[i];}
+  return{bestModel:best,prediction:pred,latest:latest,allModels:modelResult.models};
+}
+
+/* ===========================================================
+   UI RENDERING
+   =========================================================== */
+function renderPrediction(predResult){
+  if(!predResult){$('predContent').style.display='none';$('predLoading').style.display='block';return;}
+  $('predLoading').style.display='none';$('predContent').style.display='block';
+  var p=predResult.prediction,latest=predResult.latest,best=predResult.bestModel;
+  var deltaEl=$('predDelta');deltaEl.textContent=(p>0?'+':'')+fmtNum(p,0);deltaEl.className='pred-big '+(p>=0?'pos':'neg');
+  $('predContext').textContent='contracts vs last COT ('+fmtDate(latest.date)+')';
+  var level=latest.mm_net+p;$('predLevel').textContent=fmtNum(level,0);$('predLevel').className='pred-big '+(level>=0?'pos':'neg');
+  $('predLevelContext').textContent='estimated MM Net (last known: '+fmtNum(latest.mm_net,0)+')';
+  $('predR2').textContent=fmtPct(best.model.r2);$('predModelName').textContent=best.name+' (n='+best.model.n+')';
+  var info=getActiveContractInfo(latest.date);
+  if(info){$('fndInfo').innerHTML='<strong>Active:</strong> '+info.contract+' | <strong>Month:</strong> '+info.monthName+' '+info.year+' | <strong>FND:</strong> '+fmtDate(info.fnd)+' | <strong>Days to FND:</strong> '+info.daysToFND;}
+  var oiHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
+  oiHtml+='<tr><td>Active Contract</td><td class="num">'+latest.active_contract+'</td></tr>';
+  oiHtml+='<tr><td>Front Month OI (current)</td><td class="num">'+fmtNum(latest.front_oi_level,0)+'</td></tr>';
+  oiHtml+='<tr><td>Front Month OI Δ (week)</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
+  oiHtml+='<tr><td>Combined OI (current)</td><td class="num">'+fmtNum(latest.comb_oi_level,0)+'</td></tr>';
+  oiHtml+='<tr><td>Combined OI Δ (week)</td><td class="num '+(latest.comb_oi_delta>=0?'pos':'neg')+'">'+(latest.comb_oi_delta>0?'+':'')+fmtNum(latest.comb_oi_delta,0)+'</td></tr>';
+  oiHtml+='<tr><td>Price Δ (week)</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
+  oiHtml+='</tbody></table>';$('oiBreakdown').innerHTML=oiHtml;
+  var compHtml='';
+  predResult.allModels.forEach(function(m){var isBest=m.name===best.name;compHtml+='<div class="model-card '+(isBest?'best':'')+'">';compHtml+='<div class="model-title">'+m.name+(isBest?' ⭐ BEST':'')+'</div>';compHtml+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';compHtml+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';compHtml+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';compHtml+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';compHtml+='<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>';compHtml+='</div>';});
+  $('modelCompare').innerHTML=compHtml;
+  var featHtml='';var prev=mergedData.length>1?mergedData[mergedData.length-2]:null;
+  var features=[{name:'Front Month OI Δ',this:latest.front_oi_delta,last:prev?prev.front_oi_delta:null},{name:'Combined OI Δ',this:latest.comb_oi_delta,last:prev?prev.comb_oi_delta:null},{name:'Price Δ',this:latest.price_delta,last:prev?prev.price_delta:null},{name:'MM Net (lag1)',this:latest.mm_net_lag1,last:prev?prev.mm_net_lag1:null}];
+  features.forEach(function(f){var delta=(f.this!=null&&f.last!=null)?f.this-f.last:null;featHtml+='<tr><td>'+f.name+'</td><td class="num">'+fmtNum(f.this,0)+'</td><td class="num">'+fmtNum(f.last,0)+'</td><td class="num '+(delta>=0?'pos':'neg')+'">'+(delta>0?'+':'')+fmtNum(delta,0)+'</td></tr>';});
+  $('featTable').innerHTML=featHtml;
+}
+
+function renderModels(modelResult){
+  if(!modelResult){$('modelsContent').style.display='none';$('modelsLoading').style.display='block';return;}
+  $('modelsLoading').style.display='none';$('modelsContent').style.display='block';
+  var models=modelResult.models,data=modelResult.data;
+  var ctx=$('modelChart').getContext('2d');if(charts.model)charts.model.destroy();
+  charts.model=new Chart(ctx,{type:'bar',data:{labels:models.map(function(m){return m.name;}),datasets:[{label:'R²',data:models.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},{label:'Directional Accuracy',data:models.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'linear',display:true,position:'left',title:{display:true,text:'R²'},min:0,max:1},y1:{type:'linear',display:true,position:'right',title:{display:true,text:'Dir Acc'},min:0,max:1,grid:{drawOnChartArea:false}}}}});
+  var cards='';models.forEach(function(m){cards+='<div class="model-card">';cards+='<div class="model-title">'+m.name+'</div>';cards+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';cards+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';cards+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';cards+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';cards+='<div style="margin-top:6px;font-size:0.72rem;color:#555;"><strong>Coefficients:</strong> ';for(var i=0;i<m.model.names.length;i++){cards+=m.model.names[i]+'='+fmtNum(m.model.beta[i],4)+(i<m.model.names.length-1?', ':'');}cards+='</div></div>';});
+  $('modelCards').innerHTML=cards;
+  var best=models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
+  var ctx2=$('coefChart').getContext('2d');if(charts.coef)charts.coef.destroy();
+  charts.coef=new Chart(ctx2,{type:'bar',data:{labels:best.model.names.slice(1),datasets:[{label:'Coefficient',data:best.model.beta.slice(1),backgroundColor:'rgba(42,82,152,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Coefficients: '+best.name}}}});
+  var ctx3=$('residChart').getContext('2d');if(charts.resid)charts.resid.destroy();
+  charts.resid=new Chart(ctx3,{type:'scatter',data:{datasets:[{label:'Residuals',data:best.model.pred.map(function(p,i){return{x:p,y:best.model.resid[i]};}),backgroundColor:'rgba(192,57,43,0.6)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Residuals vs Fitted: '+best.name}},scales:{x:{title:{display:true,text:'Fitted Values'}},y:{title:{display:true,text:'Residuals'}}}}});
+}
+
+function renderHistory(modelResult){
+  if(!modelResult){$('histContent').style.display='none';$('histLoading').style.display='block';return;}
+  $('histLoading').style.display='none';$('histContent').style.display='block';
+  var data=modelResult.data,models=modelResult.models;
+  var best=models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
+  var dates=data.map(function(d){return d.date;}),actual=data.map(function(d,i){return modelResult.y[i];}),predicted=best.model.pred;
+  var ctx=$('histChart').getContext('2d');if(charts.hist)charts.hist.destroy();
+  charts.hist=new Chart(ctx,{type:'line',data:{labels:dates,datasets:[{label:'Actual Δ MM Net',data:actual,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.1)',fill:true,tension:0.1},{label:'Predicted ('+best.name+')',data:predicted,borderColor:'#d4880f',borderDash:[5,5],tension:0.1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Historical: Actual vs Predicted (Best Model)'}},scales:{y:{title:{display:true,text:'Δ MM Net (contracts)'}}}}});
+  var windowSize=Math.min(20,Math.floor(data.length/2)),rollingR2=[];
+  for(var i=windowSize;i<data.length;i++){var windowY=actual.slice(i-windowSize,i),windowPred=predicted.slice(i-windowSize,i);var yMean=windowY.reduce(function(a,b){return a+b;},0)/windowY.length;var ssTot=windowY.reduce(function(a,b){return a+Math.pow(b-yMean,2);},0);var ssRes=windowY.reduce(function(a,b,j){return a+Math.pow(b-windowPred[j],2);},0);rollingR2.push({x:dates[i],y:ssTot>0?1-ssRes/ssTot:0});}
+  var ctx2=$('accuracyChart').getContext('2d');if(charts.accuracy)charts.accuracy.destroy();
+  charts.accuracy=new Chart(ctx2,{type:'line',data:{datasets:[{label:'Rolling R² ('+windowSize+'wk)',data:rollingR2,borderColor:'#1a8c4e',tension:0.2,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Rolling R² Over Time'}},scales:{x:{type:'time',time:{unit:'month'}},y:{min:0,max:1,title:{display:true,text:'R²'}}}}});
+  var tbl='';models.forEach(function(m){tbl+='<tr><td>'+m.name+'</td><td class="num">'+fmtPct(m.model.r2)+'</td><td class="num">'+fmtNum(m.model.rmse,0)+'</td><td class="num">'+fmtNum(m.model.mae,0)+'</td><td class="num">'+fmtPct(m.model.dirAcc)+'</td><td class="num">'+m.model.n+'</td></tr>';});
+  $('accTable').innerHTML=tbl;
+}
+
+function renderDataTable(){
+  if(!mergedData.length){$('dataContent').style.display='none';$('dataLoading').style.display='block';return;}
+  $('dataLoading').style.display='none';$('dataContent').style.display='block';
+  var headers=['Date','MM Net','Δ MM Net','Δ Front OI','Δ Comb OI','Δ Price','Front OI','Comb OI','Active'];
+  var thead='<tr>'+headers.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';$('dataHead').innerHTML=thead;
+  var tbody='';
+  for(var i=mergedData.length-1;i>=0;i--){
+    var d=mergedData[i];
+    tbody+='<tr><td>'+fmtDate(d.date)+'</td><td class="num">'+fmtNum(d.mm_net,0)+'</td><td class="num '+(d.mm_net_delta>=0?'pos':'neg')+'">'+(d.mm_net_delta>0?'+':'')+fmtNum(d.mm_net_delta,0)+'</td><td class="num '+(d.front_oi_delta>=0?'pos':'neg')+'">'+(d.front_oi_delta>0?'+':'')+fmtNum(d.front_oi_delta,0)+'</td><td class="num '+(d.comb_oi_delta>=0?'pos':'neg')+'">'+(d.comb_oi_delta>0?'+':'')+fmtNum(d.comb_oi_delta,0)+'</td><td class="num '+(d.price_delta>=0?'pos':'neg')+'">'+(d.price_delta>0?'+':'')+fmtNum(d.price_delta,2)+'</td><td class="num">'+fmtNum(d.front_oi_level,0)+'</td><td class="num">'+fmtNum(d.comb_oi_level,0)+'</td><td>'+(d.active_contract||'')+'</td></tr>';
+  }
+  $('dataBody').innerHTML=tbody;
+}
+
+function renderDebug(){
+  if(!mergedData.length){$('debugContent').style.display='none';$('debugLoading').style.display='block';return;}
+  $('debugLoading').style.display='none';$('debugContent').style.display='block';
+  var summary='';summary+='<p><strong>OI Records:</strong> '+oiData.length+'</p>';summary+='<p><strong>COT Records:</strong> '+cotData.length+'</p>';summary+='<p><strong>Merged Weekly:</strong> '+mergedData.length+'</p>';summary+='<p><strong>Date Range:</strong> '+(oiData.length?fmtDate(oiData[0].Dates):'N/A')+' to '+(oiData.length?fmtDate(oiData[oiData.length-1].Dates):'N/A')+'</p>';$('debugSummary').innerHTML=summary;
+  var now=new Date(),fndSamples=[];
+  for(var i=0;i<CONTRACT_ORDER.length;i++){var code=CONTRACT_ORDER[i],month=CONTRACT_MONTHS[code];var fnd=computeFND(now.getFullYear(),month);fndSamples.push({contract:code,year:now.getFullYear(),fnd:fmtDate(fnd)});}
+  $('debugFnd').textContent=JSON.stringify(fndSamples,null,2);
+  if(cotData.length)$('debugCotFields').textContent=JSON.stringify(cotData[0],null,2);
+  if(oiData.length)$('debugOiSample').textContent=JSON.stringify(oiData[0],null,2);
+  if(bestModel){var dbg='Best Model: '+bestModel.name+'\n';dbg+='R²: '+bestModel.model.r2+'\n';dbg+='Coefficients:\n';for(var i=0;i<bestModel.model.names.length;i++){dbg+='  '+bestModel.model.names[i]+': '+bestModel.model.beta[i]+'\n';}$('debugReg').textContent=dbg;}
+}
+
+/* ===========================================================
+   MAIN WORKFLOW
+   =========================================================== */
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-body').forEach(function(b){b.classList.remove('active');});
+  event.target.classList.add('active');$(id).classList.add('active');
+}
+
+function loadAllData(){
+  showStatus('loadStatus','Loading data... please wait','warn');$('dlBtn').style.display='none';
+  var oiUrl=$('oiUrl').value||'data/cotton_raw.csv',cotSource=$('cotSource').value;
+  fetchText(oiUrl).then(function(text){
+    oiData=parseCSV(text);showStatus('loadStatus','OI loaded: '+oiData.length+' records. Loading COT...','ok');
+    if(cotSource==='api'){return fetchCOTFromAPI();}else{return loadCOTFromCSV($('cotCsvUrl').value||'data/cot_cotton.csv');}
+  }).then(function(cot){
+    cotData=cot;showStatus('loadStatus','COT loaded: '+cotData.length+' records. Aligning data...','ok');
+    mergedData=alignWeekly();
+    if(!mergedData.length){showStatus('loadStatus','ERROR: No aligned data. Check date formats and data overlap.','err');return;}
+    showStatus('loadStatus','Aligned: '+mergedData.length+' weekly records. Training models...','ok');
+    var modelResult=buildModels();if(!modelResult){showStatus('loadStatus','ERROR: Not enough data to train models (need >=10 weeks).','err');return;}
+    models=modelResult;bestModel=modelResult.models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
+    var predResult=predictLatest(modelResult);
+    renderPrediction(predResult);renderModels(modelResult);renderHistory(modelResult);renderDataTable();renderDebug();
+    $('dlBtn').style.display='inline-block';
+    showStatus('loadStatus','Complete! Best model: '+bestModel.name+' (R²='+fmtPct(bestModel.model.r2)+')','ok');
+  }).catch(function(e){console.error(e);showStatus('loadStatus','ERROR: '+e.message,'err');});
+}
+
+function downloadMergedCsv(){
+  if(!mergedData.length)return;
+  var csv='Date,MM_Net,MM_Net_Delta,Front_OI_Delta,Comb_OI_Delta,Price_Delta,Front_OI_Level,Comb_OI_Level,MM_Long,MM_Short,Active_Contract\n';
+  mergedData.forEach(function(d){csv+=[d.date,d.mm_net,d.mm_net_delta,d.front_oi_delta,d.comb_oi_delta,d.price_delta,d.front_oi_level,d.comb_oi_level,d.mm_long,d.mm_short,d.active_contract].join(',')+'\n';});
+  var blob=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cotton_mm_merged_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+
+$('cotSource').addEventListener('change',function(){$('cotCsvDiv').style.display=this.value==='csv'?'block':'none';});
+</script>
+
+</body>
+</html>
