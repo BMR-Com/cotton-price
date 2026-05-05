@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cotton MM Position Estimator — OI Regression</title>
+<title>Cotton MM Position Estimator — OI + Volume Regression</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
@@ -60,27 +60,28 @@
   .pred-big{font-size:2rem;font-weight:700;color:var(--acc);}
   .pred-label{font-size:0.8rem;color:#666;margin-top:4px;}
   .fnd-info{background:#e8f4fd;border:1px solid #bee5eb;border-radius:5px;padding:8px 12px;font-size:0.75rem;margin:6px 0;}
+  .transfer-alert{background:#fff3cd;border:1px solid #ffeaa7;border-radius:5px;padding:8px 12px;font-size:0.78rem;margin:6px 0;color:#856404;}
   @media(max-width:600px){.grid{grid-template-columns:1fr;}.flex{flex-direction:column;}.flex>div{width:100%;}}
 </style>
 <base target="_blank">
 </head>
 <body>
 
-<h1>🎯 Cotton Managed Money Position Estimator</h1>
-<p class="subtitle">Predict COT Managed Money Net Position changes from daily Open Interest movements | FND computed purely from exchange logic | Regression models: Front Month OI vs Combined OI</p>
+<h1>🎯 Cotton MM Position Estimator — OI + Volume Enhanced</h1>
+<p class="subtitle">Predict COT Managed Money positions from OI + Volume + Price | Separate Long/Short models | OI transfer detection</p>
 
 <div class="grid">
   <div class="card">
     <h2>📁 Data Sources</h2>
     <div class="flex">
       <div>
-        <label>Cotton OI CSV URL (only file needed)</label>
+        <label>Cotton OI CSV URL</label>
         <input type="text" id="oiUrl" value="data/cotton_raw.csv" placeholder="data/cotton_raw.csv">
       </div>
     </div>
     <div class="fnd-info">
-      <strong>FND Logic:</strong> ICE Cotton No. 2 — First Notice Day = 5 business days before the 1st business day of the delivery month. 
-      Front month auto-detected from OI data using contract month codes (MAR, MAY, JUL, OCT, DEC).
+      <strong>FND Logic:</strong> ICE Cotton No. 2 — First Notice Day = 5 business days before the 1st business day of delivery month. 
+      Front month auto-detected (MAR, MAY, JUL, OCT, DEC cycle).
     </div>
     <div class="flex" style="margin-top:8px;">
       <div>
@@ -110,32 +111,35 @@
         <input type="number" id="lookback" value="52" min="12" max="260">
       </div>
       <div>
-        <label>Min R² to Show Prediction</label>
-        <input type="number" id="minR2" value="0.15" min="0" max="1" step="0.05">
+        <label>Prediction Mode</label>
+        <select id="predMode">
+          <option value="net_direct">Net Position (Direct)</option>
+          <option value="net_combined">Net = Long - Short (Combined)</option>
+          <option value="long_short">Long & Short (Separate)</option>
+        </select>
       </div>
     </div>
     <div class="flex" style="margin-top:8px;">
       <div>
-        <label>OI Aggregation</label>
+        <label>OI Features</label>
         <select id="oiAgg">
-          <option value="both">Both: Front Month + Combined</option>
-          <option value="front">Front Month Only</option>
-          <option value="combined">Combined All Months</option>
+          <option value="both">Front + Combined OI</option>
+          <option value="front">Front Month OI Only</option>
+          <option value="combined">Combined OI Only</option>
         </select>
       </div>
       <div>
-        <label>Target</label>
-        <select id="targetVar">
-          <option value="net">Δ Net Position (contracts)</option>
-          <option value="net_pct">Δ Net % of OI</option>
-          <option value="long">Δ Long Only</option>
-          <option value="short">Δ Short Only</option>
+        <label>Volume Features</label>
+        <select id="volMode">
+          <option value="all">Volume + OI + Price</option>
+          <option value="vol_oi">Volume/OI Ratio Only</option>
+          <option value="no_vol">No Volume (OI+Price only)</option>
         </select>
       </div>
     </div>
     <div class="small" style="margin-top:8px;">
-      COT reports released Friday for Tuesday positions. OI changes Mon–Fri predict next COT.
-      Front month determined by FND: MAR→MAY→JUL→OCT→DEC cycle.
+      <strong>New:</strong> Volume data detects OI transfers (high volume + flat OI = position changes without OI movement).
+      Separate Long/Short models may improve R² when specs trade with commercials.
     </div>
   </div>
 </div>
@@ -151,22 +155,23 @@
 <div id="tab-pred" class="tab-body active">
   <div class="grid">
     <div class="card card-full">
-      <h2>🔮 Latest Managed Money Net Position Estimate</h2>
+      <h2>🔮 Latest Managed Money Position Estimate</h2>
       <div id="predLoading" style="text-align:center;padding:30px;color:#999;">Load data to generate estimate</div>
       <div id="predContent" style="display:none;">
         <div class="highlight">
-          <strong>Methodology:</strong> Daily OI changes (Mon–Fri) are aggregated into weekly changes aligned with COT report dates (Tuesday positions). 
-          FND is computed from ICE exchange rules: 5 business days before the 1st business day of delivery month. 
-          Multiple regression models are trained on historical data and the best-performing model generates the estimate.
+          <strong>Methodology:</strong> OI + Volume + Price features aligned with COT Tuesday positions. 
+          Volume detects OI transfers: high volume with flat OI suggests spec-commercial trading without net OI change.
+          Separate Long/Short models are combined for Net prediction.
         </div>
+
         <div class="grid" style="margin-top:10px;">
           <div class="card pred-box">
-            <div class="pred-label">Estimated MM Net Position Change</div>
+            <div class="pred-label">Estimated MM Net Δ</div>
             <div class="pred-big" id="predDelta">—</div>
             <div class="pred-label" id="predContext">contracts vs last COT</div>
           </div>
           <div class="card pred-box" style="border-color:var(--acc2);">
-            <div class="pred-label">Estimated MM Net Position (Level)</div>
+            <div class="pred-label">Estimated MM Net (Level)</div>
             <div class="pred-big" id="predLevel" style="color:var(--acc2);">—</div>
             <div class="pred-label" id="predLevelContext">contracts</div>
           </div>
@@ -177,16 +182,37 @@
           </div>
         </div>
 
+        <div id="longShortPred" style="display:none;">
+          <h3>Long / Short Breakdown (Combined Model)</h3>
+          <div class="grid" style="margin-top:10px;">
+            <div class="card pred-box" style="border-color:var(--acc2);">
+              <div class="pred-label">Estimated Long Δ</div>
+              <div class="pred-big" id="predLongDelta" style="color:var(--acc2);">—</div>
+            </div>
+            <div class="card pred-box" style="border-color:var(--err);">
+              <div class="pred-label">Estimated Short Δ</div>
+              <div class="pred-big" id="predShortDelta" style="color:var(--err);">—</div>
+            </div>
+            <div class="card pred-box">
+              <div class="pred-label">Net = Long - Short</div>
+              <div class="pred-big" id="predNetFromLS">—</div>
+            </div>
+          </div>
+        </div>
+
         <h3>Active Contract & FND Info</h3>
         <div id="fndInfo" class="fnd-info"></div>
 
-        <h3>Weekly OI Breakdown (Current Week)</h3>
+        <h3>OI Transfer Detection (This Week)</h3>
+        <div id="transferAlert"></div>
+
+        <h3>Weekly OI + Volume Breakdown</h3>
         <div id="oiBreakdown"></div>
 
-        <h3>Model Comparison for Current Week</h3>
+        <h3>Model Comparison</h3>
         <div id="modelCompare"></div>
 
-        <h3>Input Features (This Week vs Last Week)</h3>
+        <h3>Input Features</h3>
         <table>
           <thead><tr><th>Feature</th><th>This Week</th><th>Last Week</th><th>Δ</th></tr></thead>
           <tbody id="featTable"></tbody>
@@ -235,7 +261,7 @@
         </div>
         <h3>Directional Accuracy by Model</h3>
         <table>
-          <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>MAE</th><th>Directional Acc %</th><th>n</th></tr></thead>
+          <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>MAE</th><th>Dir Acc %</th><th>n</th></tr></thead>
           <tbody id="accTable"></tbody>
         </table>
       </div>
@@ -246,7 +272,7 @@
 <div id="tab-data" class="tab-body">
   <div class="grid">
     <div class="card card-full">
-      <h2>📋 Merged Weekly Data (COT + OI)</h2>
+      <h2>📋 Merged Weekly Data (COT + OI + Volume)</h2>
       <div id="dataLoading" style="text-align:center;padding:30px;color:#999;">Load data to view table</div>
       <div id="dataContent" style="display:none;" class="scroll">
         <table>
@@ -288,7 +314,6 @@ const COT_COMM = "COTTON NO. 2 - ICE FUTURES U.S.";
 
 const CONTRACT_MONTHS = {CTMAR:2, CTMAY:4, CTJUL:6, CTOCT:9, CTDEC:11};
 const CONTRACT_ORDER = ['CTMAR','CTMAY','CTJUL','CTOCT','CTDEC'];
-const CONTRACT_CODES = {CTMAR:'H',CTMAY:'K',CTJUL:'N',CTOCT:'V',CTDEC:'Z'};
 const CONTRACT_PREFIXES = ['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
 
 /* ===========================================================
@@ -301,23 +326,17 @@ var oiData = [], cotData = [], mergedData = [], models = {}, bestModel = null, c
    =========================================================== */
 function $(id){return document.getElementById(id);}
 function showStatus(id,msg,type){var el=$(id);el.textContent=msg;el.className='status '+type;el.style.display='block';}
-function hideStatus(id){$(id).style.display='none';}
 
 function parseDate(d){
   if(!d)return null;
   if(d instanceof Date)return d;
-  // Convert to string if number or object
   var s = (typeof d === 'string') ? d : String(d);
-  // M/D/YY format (1/3/00)
   var mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(mdy){var y=parseInt(mdy[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(mdy[1])-1,parseInt(mdy[2]));}
-  // M-D-YY
   var md2 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
   if(md2){var y=parseInt(md2[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(md2[1])-1,parseInt(md2[2]));}
-  // YYYY-MM-DD
   var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if(ymd){return new Date(parseInt(ymd[1]),parseInt(ymd[2])-1,parseInt(ymd[3]));}
-  // Try generic parse
   var iso=new Date(s);if(!isNaN(iso))return iso;
   return null;
 }
@@ -352,11 +371,9 @@ function fetchText(url,timeout){
 }
 
 /* ===========================================================
-   FND LOGIC — Pure algorithmic, no CSV needed
-   ICE Cotton No. 2: FND = 5 business days before 1st business day of delivery month
+   FND LOGIC — Pure algorithmic
    =========================================================== */
 function isWeekend(d){var day=d.getDay();return day===0||day===6;}
-
 function isHoliday(d){
   var y=d.getFullYear(),m=d.getMonth(),date=d.getDate();
   if(m===0&&date===1)return true;
@@ -374,27 +391,23 @@ function isHoliday(d){
   if(m===11&&date===26&&new Date(y,11,25).getDay()===0)return true;
   return false;
 }
-
 function subtractBusinessDays(startDate,days){
   var d=new Date(startDate);var subbed=0;
   while(subbed<days){d.setDate(d.getDate()-1);if(!isWeekend(d)&&!isHoliday(d))subbed++;}
   return d;
 }
-
 function getFirstBusinessDayOfMonth(year,month){
   var d=new Date(year,month,1);
   while(isWeekend(d)||isHoliday(d)){d.setDate(d.getDate()+1);}
   return d;
 }
-
 function computeFND(year,month){
   var firstBiz=getFirstBusinessDayOfMonth(year,month);
   return subtractBusinessDays(firstBiz,5);
 }
-
 function getActiveContract(date){
   var d=parseDate(date);if(!d)return'CTMAR1';
-  var y=d.getFullYear(),m=d.getMonth();
+  var y=d.getFullYear();
   var fnds=[];
   for(var i=0;i<CONTRACT_ORDER.length;i++){
     var code=CONTRACT_ORDER[i],month=CONTRACT_MONTHS[code];
@@ -412,13 +425,15 @@ function getActiveContract(date){
   return'CTMAR1';
 }
 
+/* ===========================================================
+   OI + VOLUME + PRICE HELPERS
+   =========================================================== */
 function getFrontMonthOI(row,date){
   var active=getActiveContract(date);
   var col=active+' Comdty OPEN_INT';
   var val=row[col];
   return(val!=null&&!isNaN(val))?val:null;
 }
-
 function getCombinedOI(row){
   var sum=0,count=0;
   for(var i=0;i<CONTRACT_PREFIXES.length;i++){
@@ -428,7 +443,27 @@ function getCombinedOI(row){
   }
   return count>0?sum:null;
 }
-
+function getFrontMonthVolume(row,date){
+  var active=getActiveContract(date);
+  var col=active+' Comdty PX_VOLUME';
+  var val=row[col];
+  return(val!=null&&!isNaN(val))?val:null;
+}
+function getCombinedVolume(row){
+  var sum=0,count=0;
+  for(var i=0;i<CONTRACT_PREFIXES.length;i++){
+    var col=CONTRACT_PREFIXES[i]+' Comdty PX_VOLUME';
+    var val=row[col];
+    if(val!=null&&!isNaN(val)){sum+=val;count++;}
+  }
+  return count>0?sum:null;
+}
+function getFrontMonthPrice(row,date){
+  var active=getActiveContract(date);
+  var col=active+' Comdty PX_LAST';
+  var val=row[col];
+  return(val!=null&&!isNaN(val))?val:null;
+}
 function getActiveContractInfo(date){
   var d=parseDate(date);if(!d)return null;
   var active=getActiveContract(date);
@@ -456,7 +491,6 @@ function fetchCOTFromAPI(){
     });
   });
 }
-
 function loadCOTFromCSV(url){
   return fetchText(url).then(function(text){
     var data=parseCSV(text);
@@ -473,11 +507,10 @@ function loadCOTFromCSV(url){
     }).filter(function(d){return d.date&&d.mm_net!=null;});
   });
 }
-
 function si(v){return(v==null||v===''||v==='#N/A N/A')?0:(parseInt(v)||0);}
 
 /* ===========================================================
-   DATA ALIGNMENT: Daily OI -> Weekly (COT Tuesday alignment)
+   DATA ALIGNMENT: Daily OI + Volume -> Weekly (COT Tuesday)
    =========================================================== */
 function alignWeekly(){
   if(!oiData.length||!cotData.length)return[];
@@ -489,24 +522,71 @@ function alignWeekly(){
     var weekOi=oiData.filter(function(r){var d=parseDate(r.Dates);if(!d)return false;return d>=weekStart&&d<=cotDate;});
     if(weekOi.length<2)continue;
     var first=weekOi[0],last=weekOi[weekOi.length-1];
-    var firstDate=parseDate(first.Dates),lastDate=parseDate(last.Dates);
+
+    // OI
     var frontStart=getFrontMonthOI(first,first.Dates),frontEnd=getFrontMonthOI(last,last.Dates);
     var frontDelta=(frontStart!=null&&frontEnd!=null)?frontEnd-frontStart:null;
     var combStart=getCombinedOI(first),combEnd=getCombinedOI(last);
     var combDelta=(combStart!=null&&combEnd!=null)?combEnd-combStart:null;
-    var frontVals=weekOi.map(function(r){return getFrontMonthOI(r,r.Dates);}).filter(function(v){return v!=null;});
-    var combVals=weekOi.map(function(r){return getCombinedOI(r);}).filter(function(v){return v!=null;});
-    var frontStd=std(frontVals),combStd=std(combVals);
-    var active=getActiveContract(cot.date),priceCol=active+' Comdty PX_LAST';
+
+    // Volume
+    var frontVolStart=getFrontMonthVolume(first,first.Dates),frontVolEnd=getFrontMonthVolume(last,last.Dates);
+    var frontVolDelta=(frontVolStart!=null&&frontVolEnd!=null)?frontVolEnd-frontVolStart:null;
+    var frontVolAvg=0,frontVolCount=0;
+    weekOi.forEach(function(r){var v=getFrontMonthVolume(r,r.Dates);if(v!=null){frontVolAvg+=v;frontVolCount++;}});
+    frontVolAvg=frontVolCount>0?frontVolAvg/frontVolCount:null;
+
+    var combVolStart=getCombinedVolume(first),combVolEnd=getCombinedVolume(last);
+    var combVolDelta=(combVolStart!=null&&combVolEnd!=null)?combVolEnd-combStart:null;
+    var combVolAvg=0,combVolCount=0;
+    weekOi.forEach(function(r){var v=getCombinedVolume(r);if(v!=null){combVolAvg+=v;combVolCount++;}});
+    combVolAvg=combVolCount>0?combVolAvg/combVolCount:null;
+
+    // Volume/OI ratio (velocity indicator)
+    var frontVelo=null,combVelo=null;
+    if(frontEnd!=null&&frontEnd>0&&frontVolAvg!=null)frontVelo=frontVolAvg/frontEnd;
+    if(combEnd!=null&&combEnd>0&&combVolAvg!=null)combVelo=combVolAvg/combEnd;
+
+    // OI Transfer detection: high volume but flat OI
+    var frontTransfer=null,combTransfer=null;
+    if(frontVolAvg!=null&&frontDelta!=null){
+      var volNorm=frontVolAvg/1000; // normalize
+      frontTransfer=volNorm>5&&Math.abs(frontDelta)<volNorm*100?1:0;
+    }
+
+    // Price
+    var active=getActiveContract(cot.date);
+    var priceCol=active+' Comdty PX_LAST';
     var priceStart=first[priceCol],priceEnd=last[priceCol];
     var priceDelta=(priceStart!=null&&priceEnd!=null)?priceEnd-priceStart:null;
-    var mmNetLag1=prevCot?prevCot.mm_net:null,mmNetLag2=(i>1)?cotData[i-2].mm_net:null;
+    var priceLevel=priceEnd;
+
+    // Price * Volume interaction
+    var priceVolInteract=null;
+    if(priceDelta!=null&&frontVolAvg!=null)priceVolInteract=priceDelta*frontVolAvg/1000;
+
+    // Lagged values
+    var mmNetLag1=prevCot?prevCot.mm_net:null;
+    var mmLongLag1=prevCot?prevCot.mm_long:null;
+    var mmShortLag1=prevCot?prevCot.mm_short:null;
+
     out.push({
-      date:cot.date,cotDate:fmtDate(cotDate),mm_net:cot.mm_net,mm_long:cot.mm_long,mm_short:cot.mm_short,
-      mm_net_delta:prevCot?(cot.mm_net-prevCot.mm_net):null,mm_long_delta:prevCot?(cot.mm_long-prevCot.mm_long):null,mm_short_delta:prevCot?(cot.mm_short-prevCot.mm_short):null,
-      oi_all:cot.oi_all,front_oi_delta:frontDelta,comb_oi_delta:combDelta,front_oi_level:frontEnd,comb_oi_level:combEnd,
-      front_oi_std:frontStd,comb_oi_std:combStd,price_delta:priceDelta,price_level:priceEnd,
-      mm_net_lag1:mmNetLag1,mm_net_lag2:mmNetLag2,days:weekOi.length,active_contract:active
+      date:cot.date,cotDate:fmtDate(cotDate),
+      mm_net:cot.mm_net,mm_long:cot.mm_long,mm_short:cot.mm_short,
+      mm_net_delta:prevCot?(cot.mm_net-prevCot.mm_net):null,
+      mm_long_delta:prevCot?(cot.mm_long-prevCot.mm_long):null,
+      mm_short_delta:prevCot?(cot.mm_short-prevCot.mm_short):null,
+      oi_all:cot.oi_all,
+      front_oi_delta:frontDelta,comb_oi_delta:combDelta,
+      front_oi_level:frontEnd,comb_oi_level:combEnd,
+      front_vol_delta:frontVolDelta,comb_vol_delta:combVolDelta,
+      front_vol_avg:frontVolAvg,comb_vol_avg:combVolAvg,
+      front_velo:frontVelo,comb_velo:combVelo,
+      front_transfer:frontTransfer,
+      price_delta:priceDelta,price_level:priceLevel,
+      price_vol_interact:priceVolInteract,
+      mm_net_lag1:mmNetLag1,mm_long_lag1:mmLongLag1,mm_short_lag1:mmShortLag1,
+      days:weekOi.length,active_contract:active
     });
   }
   return out;
@@ -515,7 +595,7 @@ function alignWeekly(){
 function std(arr){if(!arr||arr.length<2)return 0;var mean=arr.reduce(function(a,b){return a+b;},0)/arr.length;var sq=arr.map(function(v){return Math.pow(v-mean,2);});return Math.sqrt(sq.reduce(function(a,b){return a+b;},0)/(arr.length-1));}
 
 /* ===========================================================
-   REGRESSION ENGINE (OLS from scratch in JS)
+   REGRESSION ENGINE (OLS)
    =========================================================== */
 function olsRegression(y,X,names){
   var n=y.length,k=X[0].length;
@@ -536,9 +616,7 @@ function olsRegression(y,X,names){
   var dirAcc=dirTotal>0?dirCorrect/dirTotal:0;
   return{beta:beta,names:['intercept'].concat(names),r2:r2,rmse:rmse,mae:mae,dirAcc:dirAcc,n:n,pred:pred,resid:y.map(function(v,i){return v-pred[i];})};
 }
-
 function zeros(rows,cols){var out=[];for(var i=0;i<rows;i++){out.push(new Array(cols).fill(0));}return out;}
-
 function solveLinear(A,b){
   var n=A.length,aug=[];
   for(var i=0;i<n;i++){aug.push(A[i].concat([b[i][0]]));}
@@ -557,48 +635,218 @@ function solveLinear(A,b){
 }
 
 /* ===========================================================
-   MODEL BUILDING
+   MODEL BUILDING — Net, Long, Short with Volume features
    =========================================================== */
 function buildModels(){
   var data=mergedData.filter(function(d){return d.mm_net_delta!=null;});
   var lookback=parseInt($('lookback').value)||52;
-  var targetType=$('targetVar').value;
+  var predMode=$('predMode').value;
+  var volMode=$('volMode').value;
+  var oiAgg=$('oiAgg').value;
+
   if(data.length>lookback)data=data.slice(-lookback);
-  var y=data.map(function(d){if(targetType==='net')return d.mm_net_delta;if(targetType==='net_pct')return d.oi_all>0?(d.mm_net/d.oi_all*100):0;if(targetType==='long')return d.mm_long_delta;if(targetType==='short')return d.mm_short_delta;return d.mm_net_delta;});
-  var validIdx=[];for(var i=0;i<y.length;i++)if(y[i]!=null&&!isNaN(y[i]))validIdx.push(i);
-  y=validIdx.map(function(i){return y[i];});var trainData=validIdx.map(function(i){return data[i];});
-  if(y.length<10)return null;
+
+  // Filter valid data
+  var validIdx=[];
+  for(var i=0;i<data.length;i++){
+    if(data[i].mm_net_delta!=null&&!isNaN(data[i].mm_net_delta))validIdx.push(i);
+  }
+  if(validIdx.length<10)return null;
+  var trainData=validIdx.map(function(i){return data[i];});
+
+  // Build feature sets based on settings
+  var features=[];
+
+  // OI features
+  if(oiAgg==='front'||oiAgg==='both'){
+    features.push({name:'Front OI Δ',fn:function(d){return d.front_oi_delta||0;}});
+  }
+  if(oiAgg==='combined'||oiAgg==='both'){
+    features.push({name:'Comb OI Δ',fn:function(d){return d.comb_oi_delta||0;}});
+  }
+
+  // Volume features
+  if(volMode==='all'||volMode==='vol_oi'){
+    features.push({name:'Front Vol Avg',fn:function(d){return d.front_vol_avg||0;}});
+    features.push({name:'Front Velo',fn:function(d){return d.front_velo||0;}});
+  }
+  if(volMode==='all'){
+    features.push({name:'Front Vol Δ',fn:function(d){return d.front_vol_delta||0;}});
+  }
+
+  // Price features
+  features.push({name:'Price Δ',fn:function(d){return d.price_delta||0;}});
+
+  // Interaction
+  if(volMode==='all'){
+    features.push({name:'Price*Vol',fn:function(d){return d.price_vol_interact||0;}});
+  }
+
+  // Lagged
+  features.push({name:'MM Net Lag1',fn:function(d){return d.mm_net_lag1||0;}});
+
+  // Build X matrix helper
+  function buildX(dataset,featList){
+    return dataset.map(function(d){return featList.map(function(f){return f.fn(d);});});
+  }
+  function getNames(featList){return featList.map(function(f){return f.name;});}
+
   var models=[];
-  var X1=trainData.map(function(d){return[d.front_oi_delta||0];});
-  models.push({name:'Front Month OI Δ',features:['Front OI Δ'],model:olsRegression(y,X1,['Front OI Δ'])});
-  var X2=trainData.map(function(d){return[d.comb_oi_delta||0];});
-  models.push({name:'Combined OI Δ',features:['Combined OI Δ'],model:olsRegression(y,X2,['Combined OI Δ'])});
-  var X3=trainData.map(function(d){return[d.front_oi_delta||0,d.comb_oi_delta||0];});
-  models.push({name:'Front + Combined OI Δ',features:['Front OI Δ','Combined OI Δ'],model:olsRegression(y,X3,['Front OI Δ','Combined OI Δ'])});
-  var X4=trainData.map(function(d){return[d.front_oi_delta||0,d.price_delta||0];});
-  models.push({name:'Front OI Δ + Price Δ',features:['Front OI Δ','Price Δ'],model:olsRegression(y,X4,['Front OI Δ','Price Δ'])});
-  var X5=trainData.map(function(d){return[d.comb_oi_delta||0,d.price_delta||0];});
-  models.push({name:'Combined OI Δ + Price Δ',features:['Combined OI Δ','Price Δ'],model:olsRegression(y,X5,['Combined OI Δ','Price Δ'])});
-  var X6=trainData.map(function(d){return[d.front_oi_delta||0,d.comb_oi_delta||0,d.price_delta||0,d.mm_net_lag1||0];});
-  models.push({name:'Full Model (All Features)',features:['Front OI Δ','Combined OI Δ','Price Δ','MM Net Lag1'],model:olsRegression(y,X6,['Front OI Δ','Combined OI Δ','Price Δ','MM Net Lag1'])});
-  var X7=trainData.map(function(d,i){var frontSmooth=i>0?(trainData[i-1].front_oi_delta||0)*0.5+(d.front_oi_delta||0)*0.5:(d.front_oi_delta||0);var combSmooth=i>0?(trainData[i-1].comb_oi_delta||0)*0.5+(d.comb_oi_delta||0)*0.5:(d.comb_oi_delta||0);return[frontSmooth,combSmooth];});
-  models.push({name:'Smoothed OI Δ (EWMA)',features:['Front OI Δ (smooth)','Combined OI Δ (smooth)'],model:olsRegression(y,X7,['Front OI Δ (smooth)','Combined OI Δ (smooth)'])});
-  return{models:models,data:trainData,y:y};
+
+  // ========== NET MODELS ==========
+  var yNet=trainData.map(function(d){return d.mm_net_delta;});
+
+  // Model 1: OI only (baseline)
+  var f1=features.filter(function(f){return f.name.indexOf('OI')!==-1;});
+  if(f1.length){
+    var X1=buildX(trainData,f1);
+    models.push({name:'OI Only',target:'net',features:getNames(f1),model:olsRegression(yNet,X1,getNames(f1))});
+  }
+
+  // Model 2: OI + Price
+  var f2=features.filter(function(f){return f.name.indexOf('OI')!==-1||f.name==='Price Δ';});
+  var X2=buildX(trainData,f2);
+  models.push({name:'OI + Price',target:'net',features:getNames(f2),model:olsRegression(yNet,X2,getNames(f2))});
+
+  // Model 3: OI + Volume + Price
+  var f3=features.filter(function(f){return f.name!=='MM Net Lag1';});
+  var X3=buildX(trainData,f3);
+  models.push({name:'OI + Vol + Price',target:'net',features:getNames(f3),model:olsRegression(yNet,X3,getNames(f3))});
+
+  // Model 4: Full (all features)
+  var X4=buildX(trainData,features);
+  models.push({name:'Full Model',target:'net',features:getNames(features),model:olsRegression(yNet,X4,getNames(features))});
+
+  // Model 5: Volume/OI ratio focus
+  var f5=features.filter(function(f){return f.name.indexOf('Velo')!==-1||f.name==='Price Δ'||f.name==='MM Net Lag1';});
+  if(f5.length>=2){
+    var X5=buildX(trainData,f5);
+    models.push({name:'Velocity Model',target:'net',features:getNames(f5),model:olsRegression(yNet,X5,getNames(f5))});
+  }
+
+  // Model 6: Smoothed OI
+  var X6=trainData.map(function(d,i){
+    var frontSmooth=i>0?(trainData[i-1].front_oi_delta||0)*0.5+(d.front_oi_delta||0)*0.5:(d.front_oi_delta||0);
+    var combSmooth=i>0?(trainData[i-1].comb_oi_delta||0)*0.5+(d.comb_oi_delta||0)*0.5:(d.comb_oi_delta||0);
+    var volSmooth=i>0?(trainData[i-1].front_vol_avg||0)*0.5+(d.front_vol_avg||0)*0.5:(d.front_vol_avg||0);
+    return [frontSmooth,combSmooth,volSmooth,d.price_delta||0];
+  });
+  models.push({name:'Smoothed OI+Vol',target:'net',features:['Front OI Δ (s)','Comb OI Δ (s)','Vol (s)','Price Δ'],model:olsRegression(yNet,X6,['Front OI Δ (s)','Comb OI Δ (s)','Vol (s)','Price Δ'])});
+
+  // ========== SEPARATE LONG/SHORT MODELS ==========
+  if(predMode==='long_short'||predMode==='net_combined'){
+    var yLong=trainData.map(function(d){return d.mm_long_delta;}).filter(function(v,i){return v!=null&&!isNaN(v);});
+    var yShort=trainData.map(function(d){return d.mm_short_delta;}).filter(function(v,i){return v!=null&&!isNaN(v);});
+
+    // Long model
+    var validLong=[];
+    for(var i=0;i<trainData.length;i++)if(trainData[i].mm_long_delta!=null&&!isNaN(trainData[i].mm_long_delta))validLong.push(i);
+    var trainLong=validLong.map(function(i){return trainData[i];});
+    if(trainLong.length>=10){
+      var XLong=buildX(trainLong,features);
+      var yL=trainLong.map(function(d){return d.mm_long_delta;});
+      models.push({name:'Long Only (Direct)',target:'long',features:getNames(features),model:olsRegression(yL,XLong,getNames(features))});
+    }
+
+    // Short model
+    var validShort=[];
+    for(var i=0;i<trainData.length;i++)if(trainData[i].mm_short_delta!=null&&!isNaN(trainData[i].mm_short_delta))validShort.push(i);
+    var trainShort=validShort.map(function(i){return trainData[i];});
+    if(trainShort.length>=10){
+      var XShort=buildX(trainShort,features);
+      var yS=trainShort.map(function(d){return d.mm_short_delta;});
+      models.push({name:'Short Only (Direct)',target:'short',features:getNames(features),model:olsRegression(yS,XShort,getNames(features))});
+    }
+
+    // Combined Long-Short -> Net
+    if(trainLong.length>=10&&trainShort.length>=10){
+      var longPred=olsRegression(yL,XLong,getNames(features)).pred;
+      var shortPred=olsRegression(yS,XShort,getNames(features)).pred;
+      var netFromLS=longPred.map(function(l,i){return l-shortPred[i];});
+      // Calculate pseudo-R2 for combined
+      var yMean=yNet.reduce(function(a,b){return a+b;},0)/yNet.length;
+      var ssTot=yNet.reduce(function(a,b){return a+Math.pow(b-yMean,2);},0);
+      var ssRes=yNet.reduce(function(a,b,i){return a+Math.pow(yNet[i]-netFromLS[i],2);},0);
+      var r2LS=ssTot>0?1-ssRes/ssTot:0;
+
+      models.push({
+        name:'Long-Short Combined',
+        target:'net',
+        features:getNames(features),
+        model:{
+          beta:[0],names:['intercept'],r2:r2LS,rmse:Math.sqrt(ssRes/yNet.length),
+          mae:yNet.reduce(function(a,b,i){return a+Math.abs(yNet[i]-netFromLS[i]);},0)/yNet.length,
+          dirAcc:0,n:yNet.length,pred:netFromLS,resid:yNet.map(function(v,i){return v-netFromLS[i];})
+        },
+        isCombined:true,
+        longModel:olsRegression(yL,XLong,getNames(features)),
+        shortModel:olsRegression(yS,XShort,getNames(features))
+      });
+    }
+  }
+
+  return{models:models,data:trainData,yNet:yNet};
 }
 
 function predictLatest(modelResult){
   if(!modelResult||!modelResult.models.length)return null;
-  var best=modelResult.models[0];for(var i=1;i<modelResult.models.length;i++){if(modelResult.models[i].model.r2>best.model.r2)best=modelResult.models[i];}
+
+  // Find best model by R2
+  var best=modelResult.models[0];
+  for(var i=1;i<modelResult.models.length;i++){
+    if(modelResult.models[i].model.r2>best.model.r2)best=modelResult.models[i];
+  }
+
   var latest=mergedData[mergedData.length-1];if(!latest)return null;
-  var features=[];
-  if(best.name.indexOf('Front')!==-1&&best.name.indexOf('Combined')===-1){features=[latest.front_oi_delta||0];}
-  else if(best.name.indexOf('Combined')!==-1&&best.name.indexOf('Front')===-1){features=[latest.comb_oi_delta||0];}
-  else if(best.name.indexOf('Full')!==-1){features=[latest.front_oi_delta||0,latest.comb_oi_delta||0,latest.price_delta||0,latest.mm_net_lag1||0];}
-  else if(best.name.indexOf('Smoothed')!==-1){var prev=mergedData.length>1?mergedData[mergedData.length-2]:latest;var fSmooth=(prev.front_oi_delta||0)*0.5+(latest.front_oi_delta||0)*0.5;var cSmooth=(prev.comb_oi_delta||0)*0.5+(latest.comb_oi_delta||0)*0.5;features=[fSmooth,cSmooth];}
-  else{features=[latest.front_oi_delta||0,latest.comb_oi_delta||0];}
-  if(best.features.indexOf('Price Δ')!==-1&&features.length<best.features.length){features.push(latest.price_delta||0);}
-  var pred=best.model.beta[0];for(var i=0;i<features.length;i++){pred+=best.model.beta[i+1]*features[i];}
-  return{bestModel:best,prediction:pred,latest:latest,allModels:modelResult.models};
+
+  // Build feature vector for latest
+  var featVec=[];
+  best.features.forEach(function(fn){
+    if(fn==='Front OI Δ')featVec.push(latest.front_oi_delta||0);
+    else if(fn==='Comb OI Δ')featVec.push(latest.comb_oi_delta||0);
+    else if(fn==='Front Vol Avg')featVec.push(latest.front_vol_avg||0);
+    else if(fn==='Front Velo')featVec.push(latest.front_velo||0);
+    else if(fn==='Front Vol Δ')featVec.push(latest.front_vol_delta||0);
+    else if(fn==='Price Δ')featVec.push(latest.price_delta||0);
+    else if(fn==='Price*Vol')featVec.push(latest.price_vol_interact||0);
+    else if(fn==='MM Net Lag1')featVec.push(latest.mm_net_lag1||0);
+    else if(fn==='Front OI Δ (s)'){
+      var prev=mergedData.length>1?mergedData[mergedData.length-2]:latest;
+      featVec.push((prev.front_oi_delta||0)*0.5+(latest.front_oi_delta||0)*0.5);
+    }
+    else if(fn==='Comb OI Δ (s)'){
+      var prev=mergedData.length>1?mergedData[mergedData.length-2]:latest;
+      featVec.push((prev.comb_oi_delta||0)*0.5+(latest.comb_oi_delta||0)*0.5);
+    }
+    else if(fn==='Vol (s)'){
+      var prev=mergedData.length>1?mergedData[mergedData.length-2]:latest;
+      featVec.push((prev.front_vol_avg||0)*0.5+(latest.front_vol_avg||0)*0.5);
+    }
+    else featVec.push(0);
+  });
+
+  var pred=best.model.beta[0];
+  for(var i=0;i<featVec.length;i++){pred+=best.model.beta[i+1]*featVec[i];}
+
+  // Long/Short predictions if available
+  var longPred=null,shortPred=null;
+  if(best.isCombined&&best.longModel&&best.shortModel){
+    var lBeta=best.longModel.beta,sBeta=best.shortModel.beta;
+    longPred=lBeta[0];shortPred=sBeta[0];
+    for(var i=0;i<featVec.length;i++){
+      longPred+=lBeta[i+1]*featVec[i];
+      shortPred+=sBeta[i+1]*featVec[i];
+    }
+  }
+
+  return{
+    bestModel:best,
+    prediction:pred,
+    longPred:longPred,
+    shortPred:shortPred,
+    latest:latest,
+    allModels:modelResult.models
+  };
 }
 
 /* ===========================================================
@@ -608,27 +856,84 @@ function renderPrediction(predResult){
   if(!predResult){$('predContent').style.display='none';$('predLoading').style.display='block';return;}
   $('predLoading').style.display='none';$('predContent').style.display='block';
   var p=predResult.prediction,latest=predResult.latest,best=predResult.bestModel;
+
   var deltaEl=$('predDelta');deltaEl.textContent=(p>0?'+':'')+fmtNum(p,0);deltaEl.className='pred-big '+(p>=0?'pos':'neg');
   $('predContext').textContent='contracts vs last COT ('+fmtDate(latest.date)+')';
   var level=latest.mm_net+p;$('predLevel').textContent=fmtNum(level,0);$('predLevel').className='pred-big '+(level>=0?'pos':'neg');
   $('predLevelContext').textContent='estimated MM Net (last known: '+fmtNum(latest.mm_net,0)+')';
   $('predR2').textContent=fmtPct(best.model.r2);$('predModelName').textContent=best.name+' (n='+best.model.n+')';
+
+  // Long/Short breakdown
+  if(predResult.longPred!=null&&predResult.shortPred!=null){
+    $('longShortPred').style.display='block';
+    var lp=predResult.longPred,sp=predResult.shortPred;
+    $('predLongDelta').textContent=(lp>0?'+':'')+fmtNum(lp,0);$('predLongDelta').className='pred-big '+(lp>=0?'pos':'neg');
+    $('predShortDelta').textContent=(sp>0?'+':'')+fmtNum(sp,0);$('predShortDelta').className='pred-big '+(sp>=0?'pos':'neg');
+    var netLS=lp-sp;
+    $('predNetFromLS').textContent=(netLS>0?'+':'')+fmtNum(netLS,0);$('predNetFromLS').className='pred-big '+(netLS>=0?'pos':'neg');
+  }else{
+    $('longShortPred').style.display='none';
+  }
+
+  // FND Info
   var info=getActiveContractInfo(latest.date);
   if(info){$('fndInfo').innerHTML='<strong>Active:</strong> '+info.contract+' | <strong>Month:</strong> '+info.monthName+' '+info.year+' | <strong>FND:</strong> '+fmtDate(info.fnd)+' | <strong>Days to FND:</strong> '+info.daysToFND;}
+
+  // OI Transfer detection
+  var transferHtml='';
+  if(latest.front_transfer===1){
+    transferHtml='<div class="transfer-alert"><strong>⚠ OI Transfer Detected:</strong> High volume ('+fmtNum(latest.front_vol_avg,0)+') with minimal OI change ('+fmtNum(latest.front_oi_delta,0)+') suggests spec-commercial position transfer without net OI movement. Volume model may be more reliable than OI-only model.</div>';
+  }else{
+    transferHtml='<div class="transfer-alert" style="background:#d4edda;border-color:#1a8c4e;color:#155724;"><strong>✓ Normal OI Flow:</strong> Volume ('+fmtNum(latest.front_vol_avg,0)+') and OI change ('+fmtNum(latest.front_oi_delta,0)+') appear consistent.</div>';
+  }
+  $('transferAlert').innerHTML=transferHtml;
+
+  // OI + Volume Breakdown
   var oiHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
   oiHtml+='<tr><td>Active Contract</td><td class="num">'+latest.active_contract+'</td></tr>';
   oiHtml+='<tr><td>Front Month OI (current)</td><td class="num">'+fmtNum(latest.front_oi_level,0)+'</td></tr>';
-  oiHtml+='<tr><td>Front Month OI Δ (week)</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
+  oiHtml+='<tr><td>Front Month OI Δ</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
   oiHtml+='<tr><td>Combined OI (current)</td><td class="num">'+fmtNum(latest.comb_oi_level,0)+'</td></tr>';
-  oiHtml+='<tr><td>Combined OI Δ (week)</td><td class="num '+(latest.comb_oi_delta>=0?'pos':'neg')+'">'+(latest.comb_oi_delta>0?'+':'')+fmtNum(latest.comb_oi_delta,0)+'</td></tr>';
-  oiHtml+='<tr><td>Price Δ (week)</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
-  oiHtml+='</tbody></table>';$('oiBreakdown').innerHTML=oiHtml;
+  oiHtml+='<tr><td>Combined OI Δ</td><td class="num '+(latest.comb_oi_delta>=0?'pos':'neg')+'">'+(latest.comb_oi_delta>0?'+':'')+fmtNum(latest.comb_oi_delta,0)+'</td></tr>';
+  oiHtml+='<tr><td>Front Volume (avg)</td><td class="num">'+fmtNum(latest.front_vol_avg,0)+'</td></tr>';
+  oiHtml+='<tr><td>Front Volume Δ</td><td class="num '+(latest.front_vol_delta>=0?'pos':'neg')+'">'+(latest.front_vol_delta>0?'+':'')+fmtNum(latest.front_vol_delta,0)+'</td></tr>';
+  oiHtml+='<tr><td>Volume/OI Ratio</td><td class="num">'+fmtNum(latest.front_velo,4)+'</td></tr>';
+  oiHtml+='<tr><td>Price Δ</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
+  oiHtml+='<tr><td>Price×Vol Interaction</td><td class="num">'+fmtNum(latest.price_vol_interact,2)+'</td></tr>';
+  oiHtml+='</tbody></table>';
+  $('oiBreakdown').innerHTML=oiHtml;
+
+  // Model comparison
   var compHtml='';
-  predResult.allModels.forEach(function(m){var isBest=m.name===best.name;compHtml+='<div class="model-card '+(isBest?'best':'')+'">';compHtml+='<div class="model-title">'+m.name+(isBest?' ⭐ BEST':'')+'</div>';compHtml+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';compHtml+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';compHtml+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';compHtml+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';compHtml+='<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>';compHtml+='</div>';});
+  predResult.allModels.forEach(function(m){
+    var isBest=m.name===best.name;
+    compHtml+='<div class="model-card '+(isBest?'best':'')+'">';
+    compHtml+='<div class="model-title">'+m.name+(isBest?' ⭐ BEST':'')+' ['+m.target.toUpperCase()+']</div>';
+    compHtml+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';
+    compHtml+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';
+    compHtml+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';
+    compHtml+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';
+    compHtml+='<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>';
+    if(m.isCombined)compHtml+='<div style="font-size:0.72rem;color:#555;"><em>Combined from Long - Short models</em></div>';
+    compHtml+='</div>';
+  });
   $('modelCompare').innerHTML=compHtml;
+
+  // Feature table
   var featHtml='';var prev=mergedData.length>1?mergedData[mergedData.length-2]:null;
-  var features=[{name:'Front Month OI Δ',this:latest.front_oi_delta,last:prev?prev.front_oi_delta:null},{name:'Combined OI Δ',this:latest.comb_oi_delta,last:prev?prev.comb_oi_delta:null},{name:'Price Δ',this:latest.price_delta,last:prev?prev.price_delta:null},{name:'MM Net (lag1)',this:latest.mm_net_lag1,last:prev?prev.mm_net_lag1:null}];
-  features.forEach(function(f){var delta=(f.this!=null&&f.last!=null)?f.this-f.last:null;featHtml+='<tr><td>'+f.name+'</td><td class="num">'+fmtNum(f.this,0)+'</td><td class="num">'+fmtNum(f.last,0)+'</td><td class="num '+(delta>=0?'pos':'neg')+'">'+(delta>0?'+':'')+fmtNum(delta,0)+'</td></tr>';});
+  var features=[
+    {name:'Front Month OI Δ',this:latest.front_oi_delta,last:prev?prev.front_oi_delta:null},
+    {name:'Combined OI Δ',this:latest.comb_oi_delta,last:prev?prev.comb_oi_delta:null},
+    {name:'Front Volume (avg)',this:latest.front_vol_avg,last:prev?prev.front_vol_avg:null},
+    {name:'Volume/OI Ratio',this:latest.front_velo,last:prev?prev.front_velo:null},
+    {name:'Price Δ',this:latest.price_delta,last:prev?prev.price_delta:null},
+    {name:'Price×Vol',this:latest.price_vol_interact,last:prev?prev.price_vol_interact:null},
+    {name:'MM Net (lag1)',this:latest.mm_net_lag1,last:prev?prev.mm_net_lag1:null}
+  ];
+  features.forEach(function(f){
+    var delta=(f.this!=null&&f.last!=null)?f.this-f.last:null;
+    featHtml+='<tr><td>'+f.name+'</td><td class="num">'+fmtNum(f.this,2)+'</td><td class="num">'+fmtNum(f.last,2)+'</td><td class="num '+(delta>=0?'pos':'neg')+'">'+(delta>0?'+':'')+fmtNum(delta,2)+'</td></tr>';
+  });
   $('featTable').innerHTML=featHtml;
 }
 
@@ -636,13 +941,17 @@ function renderModels(modelResult){
   if(!modelResult){$('modelsContent').style.display='none';$('modelsLoading').style.display='block';return;}
   $('modelsLoading').style.display='none';$('modelsContent').style.display='block';
   var models=modelResult.models,data=modelResult.data;
+
   var ctx=$('modelChart').getContext('2d');if(charts.model)charts.model.destroy();
   charts.model=new Chart(ctx,{type:'bar',data:{labels:models.map(function(m){return m.name;}),datasets:[{label:'R²',data:models.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},{label:'Directional Accuracy',data:models.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'linear',display:true,position:'left',title:{display:true,text:'R²'},min:0,max:1},y1:{type:'linear',display:true,position:'right',title:{display:true,text:'Dir Acc'},min:0,max:1,grid:{drawOnChartArea:false}}}}});
-  var cards='';models.forEach(function(m){cards+='<div class="model-card">';cards+='<div class="model-title">'+m.name+'</div>';cards+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';cards+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';cards+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';cards+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';cards+='<div style="margin-top:6px;font-size:0.72rem;color:#555;"><strong>Coefficients:</strong> ';for(var i=0;i<m.model.names.length;i++){cards+=m.model.names[i]+'='+fmtNum(m.model.beta[i],4)+(i<m.model.names.length-1?', ':'');}cards+='</div></div>';});
+
+  var cards='';models.forEach(function(m){cards+='<div class="model-card">';cards+='<div class="model-title">'+m.name+' ['+m.target.toUpperCase()+']</div>';cards+='<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>';cards+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';cards+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';cards+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';cards+='<div style="margin-top:6px;font-size:0.72rem;color:#555;"><strong>Coefficients:</strong> ';for(var i=0;i<m.model.names.length;i++){cards+=m.model.names[i]+'='+fmtNum(m.model.beta[i],4)+(i<m.model.names.length-1?', ':'');}cards+='</div></div>';});
   $('modelCards').innerHTML=cards;
+
   var best=models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
   var ctx2=$('coefChart').getContext('2d');if(charts.coef)charts.coef.destroy();
   charts.coef=new Chart(ctx2,{type:'bar',data:{labels:best.model.names.slice(1),datasets:[{label:'Coefficient',data:best.model.beta.slice(1),backgroundColor:'rgba(42,82,152,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Coefficients: '+best.name}}}});
+
   var ctx3=$('residChart').getContext('2d');if(charts.resid)charts.resid.destroy();
   charts.resid=new Chart(ctx3,{type:'scatter',data:{datasets:[{label:'Residuals',data:best.model.pred.map(function(p,i){return{x:p,y:best.model.resid[i]};}),backgroundColor:'rgba(192,57,43,0.6)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Residuals vs Fitted: '+best.name}},scales:{x:{title:{display:true,text:'Fitted Values'}},y:{title:{display:true,text:'Residuals'}}}}});
 }
@@ -652,26 +961,28 @@ function renderHistory(modelResult){
   $('histLoading').style.display='none';$('histContent').style.display='block';
   var data=modelResult.data,models=modelResult.models;
   var best=models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
-  var dates=data.map(function(d){return d.date;}),actual=data.map(function(d,i){return modelResult.y[i];}),predicted=best.model.pred;
+  var dates=data.map(function(d){return d.date;}),actual=data.map(function(d){return d.mm_net_delta;}),predicted=best.model.pred;
   var ctx=$('histChart').getContext('2d');if(charts.hist)charts.hist.destroy();
   charts.hist=new Chart(ctx,{type:'line',data:{labels:dates,datasets:[{label:'Actual Δ MM Net',data:actual,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.1)',fill:true,tension:0.1},{label:'Predicted ('+best.name+')',data:predicted,borderColor:'#d4880f',borderDash:[5,5],tension:0.1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Historical: Actual vs Predicted (Best Model)'}},scales:{y:{title:{display:true,text:'Δ MM Net (contracts)'}}}}});
+
   var windowSize=Math.min(20,Math.floor(data.length/2)),rollingR2=[];
   for(var i=windowSize;i<data.length;i++){var windowY=actual.slice(i-windowSize,i),windowPred=predicted.slice(i-windowSize,i);var yMean=windowY.reduce(function(a,b){return a+b;},0)/windowY.length;var ssTot=windowY.reduce(function(a,b){return a+Math.pow(b-yMean,2);},0);var ssRes=windowY.reduce(function(a,b,j){return a+Math.pow(b-windowPred[j],2);},0);rollingR2.push({x:dates[i],y:ssTot>0?1-ssRes/ssTot:0});}
   var ctx2=$('accuracyChart').getContext('2d');if(charts.accuracy)charts.accuracy.destroy();
   charts.accuracy=new Chart(ctx2,{type:'line',data:{datasets:[{label:'Rolling R² ('+windowSize+'wk)',data:rollingR2,borderColor:'#1a8c4e',tension:0.2,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Rolling R² Over Time'}},scales:{x:{type:'time',time:{unit:'month'}},y:{min:0,max:1,title:{display:true,text:'R²'}}}}});
-  var tbl='';models.forEach(function(m){tbl+='<tr><td>'+m.name+'</td><td class="num">'+fmtPct(m.model.r2)+'</td><td class="num">'+fmtNum(m.model.rmse,0)+'</td><td class="num">'+fmtNum(m.model.mae,0)+'</td><td class="num">'+fmtPct(m.model.dirAcc)+'</td><td class="num">'+m.model.n+'</td></tr>';});
+
+  var tbl='';models.forEach(function(m){tbl+='<tr><td>'+m.name+' ['+m.target.toUpperCase()+']</td><td class="num">'+fmtPct(m.model.r2)+'</td><td class="num">'+fmtNum(m.model.rmse,0)+'</td><td class="num">'+fmtNum(m.model.mae,0)+'</td><td class="num">'+fmtPct(m.model.dirAcc)+'</td><td class="num">'+m.model.n+'</td></tr>';});
   $('accTable').innerHTML=tbl;
 }
 
 function renderDataTable(){
   if(!mergedData.length){$('dataContent').style.display='none';$('dataLoading').style.display='block';return;}
   $('dataLoading').style.display='none';$('dataContent').style.display='block';
-  var headers=['Date','MM Net','Δ MM Net','Δ Front OI','Δ Comb OI','Δ Price','Front OI','Comb OI','Active'];
+  var headers=['Date','MM Net','Δ Net','Δ Long','Δ Short','Δ Front OI','Δ Comb OI','Front Vol','Vol/OI','Δ Price','Active'];
   var thead='<tr>'+headers.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';$('dataHead').innerHTML=thead;
   var tbody='';
   for(var i=mergedData.length-1;i>=0;i--){
     var d=mergedData[i];
-    tbody+='<tr><td>'+fmtDate(d.date)+'</td><td class="num">'+fmtNum(d.mm_net,0)+'</td><td class="num '+(d.mm_net_delta>=0?'pos':'neg')+'">'+(d.mm_net_delta>0?'+':'')+fmtNum(d.mm_net_delta,0)+'</td><td class="num '+(d.front_oi_delta>=0?'pos':'neg')+'">'+(d.front_oi_delta>0?'+':'')+fmtNum(d.front_oi_delta,0)+'</td><td class="num '+(d.comb_oi_delta>=0?'pos':'neg')+'">'+(d.comb_oi_delta>0?'+':'')+fmtNum(d.comb_oi_delta,0)+'</td><td class="num '+(d.price_delta>=0?'pos':'neg')+'">'+(d.price_delta>0?'+':'')+fmtNum(d.price_delta,2)+'</td><td class="num">'+fmtNum(d.front_oi_level,0)+'</td><td class="num">'+fmtNum(d.comb_oi_level,0)+'</td><td>'+(d.active_contract||'')+'</td></tr>';
+    tbody+='<tr><td>'+fmtDate(d.date)+'</td><td class="num">'+fmtNum(d.mm_net,0)+'</td><td class="num '+(d.mm_net_delta>=0?'pos':'neg')+'">'+(d.mm_net_delta>0?'+':'')+fmtNum(d.mm_net_delta,0)+'</td><td class="num '+(d.mm_long_delta>=0?'pos':'neg')+'">'+(d.mm_long_delta>0?'+':'')+fmtNum(d.mm_long_delta,0)+'</td><td class="num '+(d.mm_short_delta>=0?'pos':'neg')+'">'+(d.mm_short_delta>0?'+':'')+fmtNum(d.mm_short_delta,0)+'</td><td class="num '+(d.front_oi_delta>=0?'pos':'neg')+'">'+(d.front_oi_delta>0?'+':'')+fmtNum(d.front_oi_delta,0)+'</td><td class="num '+(d.comb_oi_delta>=0?'pos':'neg')+'">'+(d.comb_oi_delta>0?'+':'')+fmtNum(d.comb_oi_delta,0)+'</td><td class="num">'+fmtNum(d.front_vol_avg,0)+'</td><td class="num">'+fmtNum(d.front_velo,4)+'</td><td class="num '+(d.price_delta>=0?'pos':'neg')+'">'+(d.price_delta>0?'+':'')+fmtNum(d.price_delta,2)+'</td><td>'+(d.active_contract||'')+'</td></tr>';
   }
   $('dataBody').innerHTML=tbody;
 }
@@ -685,7 +996,7 @@ function renderDebug(){
   $('debugFnd').textContent=JSON.stringify(fndSamples,null,2);
   if(cotData.length)$('debugCotFields').textContent=JSON.stringify(cotData[0],null,2);
   if(oiData.length)$('debugOiSample').textContent=JSON.stringify(oiData[0],null,2);
-  if(bestModel){var dbg='Best Model: '+bestModel.name+'\n';dbg+='R²: '+bestModel.model.r2+'\n';dbg+='Coefficients:\n';for(var i=0;i<bestModel.model.names.length;i++){dbg+='  '+bestModel.model.names[i]+': '+bestModel.model.beta[i]+'\n';}$('debugReg').textContent=dbg;}
+  if(bestModel){var dbg='Best Model: '+bestModel.name+' ['+bestModel.target.toUpperCase()+']\n';dbg+='R²: '+bestModel.model.r2+'\n';dbg+='Coefficients:\n';for(var i=0;i<bestModel.model.names.length;i++){dbg+='  '+bestModel.model.names[i]+': '+bestModel.model.beta[i]+'\n';}$('debugReg').textContent=dbg;}
 }
 
 /* ===========================================================
@@ -713,14 +1024,14 @@ function loadAllData(){
     var predResult=predictLatest(modelResult);
     renderPrediction(predResult);renderModels(modelResult);renderHistory(modelResult);renderDataTable();renderDebug();
     $('dlBtn').style.display='inline-block';
-    showStatus('loadStatus','Complete! Best model: '+bestModel.name+' (R²='+fmtPct(bestModel.model.r2)+')','ok');
+    showStatus('loadStatus','Complete! Best: '+bestModel.name+' ['+bestModel.target.toUpperCase()+'] (R²='+fmtPct(bestModel.model.r2)+')','ok');
   }).catch(function(e){console.error(e);showStatus('loadStatus','ERROR: '+e.message,'err');});
 }
 
 function downloadMergedCsv(){
   if(!mergedData.length)return;
-  var csv='Date,MM_Net,MM_Net_Delta,Front_OI_Delta,Comb_OI_Delta,Price_Delta,Front_OI_Level,Comb_OI_Level,MM_Long,MM_Short,Active_Contract\n';
-  mergedData.forEach(function(d){csv+=[d.date,d.mm_net,d.mm_net_delta,d.front_oi_delta,d.comb_oi_delta,d.price_delta,d.front_oi_level,d.comb_oi_level,d.mm_long,d.mm_short,d.active_contract].join(',')+'\n';});
+  var csv='Date,MM_Net,MM_Net_Delta,MM_Long_Delta,MM_Short_Delta,Front_OI_Delta,Comb_OI_Delta,Front_Vol_Avg,Front_Velo,Price_Delta,Price_Vol_Interact,Active_Contract\n';
+  mergedData.forEach(function(d){csv+=[d.date,d.mm_net,d.mm_net_delta,d.mm_long_delta,d.mm_short_delta,d.front_oi_delta,d.comb_oi_delta,d.front_vol_avg,d.front_velo,d.price_delta,d.price_vol_interact,d.active_contract].join(',')+'\n';});
   var blob=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cotton_mm_merged_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
 }
 
