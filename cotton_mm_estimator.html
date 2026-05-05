@@ -322,7 +322,11 @@ var currentCsvFile = null, csvRawData = [], parsedCsvDays = {}, selectedDate = n
    UTILITIES
    =========================================================== */
 function $(id){return document.getElementById(id);}
-function showStatus(id,msg,type){var el=$(id);el.textContent=msg;el.className='status '+type;el.style.display='block';}
+function showStatus(id,msg,type){
+  var el=$(id);
+  if(!el){console.error('Element not found: '+id);return;}
+  el.textContent=msg;el.className='status '+type;el.style.display='block';
+}
 
 function parseDate(d){
   if(!d)return null;
@@ -379,29 +383,17 @@ function fetchJson(url,timeout){
 }
 
 /* ===========================================================
-   CSV FILE HANDLING — DRAG & DROP + FILE INPUT
+   CSV FILE HANDLING
    =========================================================== */
-var dropZone=$('dropZone');
-var fileInput=$('csvFileInput');
-
-dropZone.addEventListener('click',function(){fileInput.click();});
-dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('dragover');});
-dropZone.addEventListener('dragleave',function(e){e.preventDefault();this.classList.remove('dragover');});
-dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('dragover');var f=e.dataTransfer.files[0];if(f&&f.name.toLowerCase().endsWith('.csv')){handleCsvFile(f);}else{showStatus('csvParseStatus','Please drop a .csv file','err');}});
-
-fileInput.addEventListener('change',function(e){var f=e.target.files[0];if(f)handleCsvFile(f);});
-
 function handleCsvFile(file){
   currentCsvFile=file;
-  $('csvFileName').textContent='Selected: '+file.name;
+  var nameEl=$('csvFileName');
+  if(nameEl)nameEl.textContent='Selected: '+file.name;
   showStatus('csvParseStatus','CSV ready: '+file.name+'. Click "Parse CSV Data" to process.','ok');
-  $('parseCsvBtn').disabled=false;
+  var btn=$('parseCsvBtn');
+  if(btn)btn.disabled=false;
 }
 
-/* ===========================================================
-   CSV PARSER — cotton_daily_ice_reports.csv format
-   Format: Date,Contract,Settle,PriceChg,Volume,OI,OIChg,TotalVolume,TotalOI,TotalOIChg
-   =========================================================== */
 function parseCsvFile(){
   if(!currentCsvFile){showStatus('csvParseStatus','Select a CSV file first','err');return;}
   showStatus('csvParseStatus','Reading CSV...','warn');
@@ -420,7 +412,6 @@ function parseCsvFile(){
 function processCsvDays(){
   if(!csvRawData.length){showStatus('csvParseStatus','No data in CSV','err');return;}
 
-  // Group by date
   parsedCsvDays={};
   for(var i=0;i<csvRawData.length;i++){
     var row=csvRawData[i];
@@ -440,7 +431,6 @@ function processCsvDays(){
       };
     }
 
-    // Use totals from any row (they're the same per day)
     if(row.TotalVolume!=null){
       parsedCsvDays[date].totals={
         total_volume:parseInt(row.TotalVolume)||0,
@@ -453,17 +443,17 @@ function processCsvDays(){
   var dates=Object.keys(parsedCsvDays).sort();
   if(!dates.length){showStatus('csvParseStatus','No valid dates found in CSV','err');return;}
 
-  // Build date selector chips
   var selectorHtml='';
   for(var i=0;i<dates.length;i++){
     var d=dates[i];
     var isLatest=(i===dates.length-1);
     selectorHtml+='<div class="date-chip '+(isLatest?'active':'')+'" onclick="selectDate(''+d+'',this)">'+d+'</div>';
   }
-  $('dateSelector').innerHTML=selectorHtml;
-  $('dateSelectorSection').style.display='block';
+  var selEl=$('dateSelector');
+  if(selEl)selEl.innerHTML=selectorHtml;
+  var secEl=$('dateSelectorSection');
+  if(secEl)secEl.style.display='block';
 
-  // Auto-select latest date
   selectedDate=dates[dates.length-1];
   buildLatestWeekData(selectedDate);
 }
@@ -479,40 +469,49 @@ function buildLatestWeekData(date){
   var dayData=parsedCsvDays[date];
   if(!dayData){showStatus('csvParseStatus','No data for date '+date,'err');return;}
 
-  // Find front month (Jul-26 for now, or determine from active contract logic)
   var frontContract='Jul-26';
-  var frontData=dayData.contracts[frontContract]||dayData.contracts[Object.keys(dayData.contracts)[0]];
-  var totals=dayData.totals||{total_volume:0,total_oi:0,total_oi_chg:0};
+  var frontData=dayData.contracts[frontContract];
+  if(!frontData){
+    var keys=Object.keys(dayData.contracts);
+    for(var i=0;i<keys.length;i++){
+      if(keys[i].indexOf('Jul')>=0){frontData=dayData.contracts[keys[i]];break;}
+    }
+  }
+  if(!frontData)frontData=dayData.contracts[Object.keys(dayData.contracts)[0]];
 
+  var totals=dayData.totals||{total_volume:0,total_oi:0,total_oi_chg:0};
   var reportDate=parseDate(date);
   var lastCot=mergedHistory.length>0?mergedHistory[0]:null;
 
   latestWeekData={
     date:date,
     report_date:reportDate,
-    front_oi_level:frontData.oi,
-    front_oi_delta:frontData.oi_chg,
+    front_oi_level:frontData?frontData.oi:0,
+    front_oi_delta:frontData?frontData.oi_chg:0,
     comb_oi_level:totals.total_oi,
     comb_oi_delta:totals.total_oi_chg,
-    front_vol_avg:frontData.volume,
+    front_vol_avg:frontData?frontData.volume:0,
     front_vol_delta:0,
-    front_velo:frontData.oi>0?frontData.volume/frontData.oi:0,
-    price_delta:frontData.price_chg,
-    price_level:frontData.settle,
-    price_vol_interact:frontData.price_chg*frontData.volume/1000,
+    front_velo:(frontData&&frontData.oi>0)?frontData.volume/frontData.oi:0,
+    price_delta:frontData?frontData.price_chg:0,
+    price_level:frontData?frontData.settle:0,
+    price_vol_interact:frontData?frontData.price_chg*frontData.volume/1000:0,
     mm_net_lag1:lastCot?lastCot.mm_net:null,
     active_contract:'CTJUL1',
     all_contracts:dayData.contracts
   };
 
-  showStatus('csvParseStatus','Selected: '+date+' | Front: '+frontContract+' | OI: '+frontData.oi+' | Vol: '+frontData.volume+' | Contracts: '+Object.keys(dayData.contracts).length,'ok');
+  showStatus('csvParseStatus','Selected: '+date+' | Front: '+(frontData?frontData.contract:'N/A')+' | OI: '+(frontData?frontData.oi:0)+' | Vol: '+(frontData?frontData.volume:0),'ok');
   renderCsvParsed(latestWeekData,dayData.contracts);
-  $('predictBtn').disabled=false;
-  $('compareBtn').disabled=false;
+  var pBtn=$('predictBtn');
+  if(pBtn)pBtn.disabled=false;
+  var cBtn=$('compareBtn');
+  if(cBtn)cBtn.disabled=false;
 }
 
 function renderCsvParsed(latest,contracts){
-  $('csvParsedSection').style.display='block';
+  var sec=$('csvParsedSection');
+  if(sec)sec.style.display='block';
 
   var sumHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
   sumHtml+='<tr><td>Report Date</td><td class="num">'+fmtDate(latest.date)+'</td></tr>';
@@ -526,7 +525,8 @@ function renderCsvParsed(latest,contracts){
   sumHtml+='<tr><td>Price Change</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
   sumHtml+='<tr><td>Last Known MM Net</td><td class="num">'+fmtNum(latest.mm_net_lag1,0)+'</td></tr>';
   sumHtml+='</tbody></table>';
-  $('csvParsedSummary').innerHTML=sumHtml;
+  var sumEl=$('csvParsedSummary');
+  if(sumEl)sumEl.innerHTML=sumHtml;
 
   var contHtml='<table><thead><tr><th>Contract</th><th>Settle</th><th>Δ</th><th>Vol</th><th>OI</th><th>OI Δ</th></tr></thead><tbody>';
   for(var k in contracts){
@@ -534,7 +534,8 @@ function renderCsvParsed(latest,contracts){
     contHtml+='<tr><td>'+k+'</td><td class="num">'+fmtNum(c.settle,2)+'</td><td class="num '+(c.price_chg>=0?'pos':'neg')+'">'+(c.price_chg>0?'+':'')+fmtNum(c.price_chg,2)+'</td><td class="num">'+fmtNum(c.volume,0)+'</td><td class="num">'+fmtNum(c.oi,0)+'</td><td class="num '+(c.oi_chg>=0?'pos':'neg')+'">'+(c.oi_chg>0?'+':'')+fmtNum(c.oi_chg,0)+'</td></tr>';
   }
   contHtml+='</tbody></table>';
-  $('csvParsedContracts').innerHTML=contHtml;
+  var contEl=$('csvParsedContracts');
+  if(contEl)contEl.innerHTML=contHtml;
 }
 
 function clearCsvInput(){
@@ -542,14 +543,21 @@ function clearCsvInput(){
   csvRawData=[];
   parsedCsvDays={};
   selectedDate=null;
-  $('csvFileName').textContent='';
-  $('csvFileInput').value='';
-  $('csvParsedSection').style.display='none';
-  $('dateSelectorSection').style.display='none';
-  $('parseCsvBtn').disabled=true;
+  var nameEl=$('csvFileName');
+  if(nameEl)nameEl.textContent='';
+  var inputEl=$('csvFileInput');
+  if(inputEl)inputEl.value='';
+  var sec=$('csvParsedSection');
+  if(sec)sec.style.display='none';
+  var dsec=$('dateSelectorSection');
+  if(dsec)dsec.style.display='none';
+  var btn=$('parseCsvBtn');
+  if(btn)btn.disabled=true;
   latestWeekData=null;
-  $('predictBtn').disabled=true;
-  $('compareBtn').disabled=true;
+  var pBtn=$('predictBtn');
+  if(pBtn)pBtn.disabled=true;
+  var cBtn=$('compareBtn');
+  if(cBtn)cBtn.disabled=true;
 }
 
 /* ===========================================================
@@ -631,15 +639,21 @@ function loadOiData(){
 
 function renderHistoricalPreview(){
   if(!oiData.length)return;
-  $('dataLoading').style.display='none';$('dataContent').style.display='block';
+  var dLoad=$('dataLoading');
+  var dCont=$('dataContent');
+  if(dLoad)dLoad.style.display='none';
+  if(dCont)dCont.style.display='block';
   var headers=['Date','Front OI','Comb OI','Front Vol','Comb Vol','Price','Active'];
-  var thead='<tr>'+headers.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';$('dataHead').innerHTML=thead;
+  var thead='<tr>'+headers.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';
+  var headEl=$('dataHead');
+  if(headEl)headEl.innerHTML=thead;
   var tbody='';
   for(var i=Math.max(0,oiData.length-5);i<oiData.length;i++){
     var d=oiData[i];
     tbody+='<tr><td>'+fmtDate(d.Dates)+'</td><td class="num">'+fmtNum(getFrontMonthOI(d,d.Dates),0)+'</td><td class="num">'+fmtNum(getCombinedOI(d),0)+'</td><td class="num">'+fmtNum(getFrontMonthVolume(d,d.Dates),0)+'</td><td class="num">'+fmtNum(getCombinedVolume(d),0)+'</td><td class="num">'+fmtNum(getFrontMonthPrice(d,d.Dates),2)+'</td><td>'+getActiveContract(d.Dates)+'</td></tr>';
   }
-  $('dataBody').innerHTML=tbody;
+  var bodyEl=$('dataBody');
+  if(bodyEl)bodyEl.innerHTML=tbody;
 }
 
 /* ===========================================================
@@ -814,16 +828,23 @@ function renderComparison(){
   var errorPct=actualNet!==0?Math.abs(error/actualNet)*100:0;
   var dirCorrect=(predNet>0&&actualDelta>0)||(predNet<0&&actualDelta<0)||(predNet===0&&actualDelta===0);
 
-  $('comparisonSection').style.display='block';
+  var compSec=$('comparisonSection');
+  if(compSec)compSec.style.display='block';
 
-  $('compPredNet').textContent=fmtNum(predLevel,0);
-  $('compPredDelta').textContent='Δ: '+(predNet>0?'+':'')+fmtNum(predNet,0);
-  $('compActualNet').textContent=fmtNum(actualNet,0);
-  $('compActualDelta').textContent='Δ: '+(actualDelta>0?'+':'')+fmtNum(actualDelta,0);
-  $('compError').textContent=(error>0?'+':'')+fmtNum(error,0);
-  $('compErrorPct').textContent='Error: '+fmtNum(errorPct,1)+'%';
-  $('compDir').textContent=dirCorrect?'✓':'✗';
-  $('compDir').style.color=dirCorrect?'#1a8c4e':'#c0392b';
+  var pNet=$('compPredNet');
+  if(pNet)pNet.textContent=fmtNum(predLevel,0);
+  var pDelta=$('compPredDelta');
+  if(pDelta)pDelta.textContent='Δ: '+(predNet>0?'+':'')+fmtNum(predNet,0);
+  var aNet=$('compActualNet');
+  if(aNet)aNet.textContent=fmtNum(actualNet,0);
+  var aDelta=$('compActualDelta');
+  if(aDelta)aDelta.textContent='Δ: '+(actualDelta>0?'+':'')+fmtNum(actualDelta,0);
+  var errEl=$('compError');
+  if(errEl)errEl.textContent=(error>0?'+':'')+fmtNum(error,0);
+  var errPct=$('compErrorPct');
+  if(errPct)errPct.textContent='Error: '+fmtNum(errorPct,1)+'%';
+  var dirEl=$('compDir');
+  if(dirEl){dirEl.textContent=dirCorrect?'✓':'✗';dirEl.style.color=dirCorrect?'#1a8c4e':'#c0392b';}
 
   var tbl='';
   tbl+='<tr><td>MM Net Position</td><td class="num">'+fmtNum(predLevel,0)+'</td><td class="num">'+fmtNum(actualNet,0)+'</td><td class="num '+(Math.abs(error)<1000?'actual-good':Math.abs(error)<3000?'actual-ok':'actual-bad')+'">'+(error>0?'+':'')+fmtNum(error,0)+'</td></tr>';
@@ -832,15 +853,19 @@ function renderComparison(){
   tbl+='<tr><td>MM Short</td><td class="num">—</td><td class="num">'+fmtNum(actualCotData.mm_short,0)+'</td><td class="num">—</td></tr>';
   tbl+='<tr><td>MM Spread</td><td class="num">—</td><td class="num">'+fmtNum(actualCotData.mm_spread,0)+'</td><td class="num">—</td></tr>';
   tbl+='<tr><td>Total OI</td><td class="num">'+fmtNum(latestWeekData.comb_oi_level,0)+'</td><td class="num">'+fmtNum(actualCotData.total_oi,0)+'</td><td class="num">'+fmtNum(latestWeekData.comb_oi_level-actualCotData.total_oi,0)+'</td></tr>';
-  $('compTable').innerHTML=tbl;
+  var compTbl=$('compTable');
+  if(compTbl)compTbl.innerHTML=tbl;
 
   renderComparisonChart();
-  $('debugActualCot').textContent=JSON.stringify(actualCotData,null,2);
+  var debugCot=$('debugActualCot');
+  if(debugCot)debugCot.textContent=JSON.stringify(actualCotData,null,2);
 }
 
 function renderComparisonChart(){
   if(!mergedHistory.length)return;
-  var ctx=$('comparisonChart').getContext('2d');
+  var ctx=$('comparisonChart');
+  if(!ctx)return;
+  ctx=ctx.getContext('2d');
   if(charts.comparison)charts.comparison.destroy();
 
   var labels=mergedHistory.slice(0,8).map(function(d){return fmtDate(d.date);}).reverse();
@@ -980,8 +1005,10 @@ function trainModels(){
   bestModel=modelsList.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
 
   showStatus('actionStatus','Trained '+modelsList.length+' models. Best: '+bestModel.name+' (R2='+fmtPct(bestModel.model.r2)+')','ok');
-  $('predictBtn').disabled=!latestWeekData;
-  $('backtestBtn').disabled=false;
+  var pBtn=$('predictBtn');
+  if(pBtn)pBtn.disabled=!latestWeekData;
+  var bBtn=$('backtestBtn');
+  if(bBtn)bBtn.disabled=false;
 
   renderModelComparison();
 }
@@ -1016,11 +1043,16 @@ function predictNextCot(){
   var pred=predictWithModel(bestModel,latestWeekData);
   var level=(latestWeekData.mm_net_lag1||0)+pred;
 
-  $('predictionSection').style.display='block';
-  $('predNet').textContent=fmtNum(level,0);$('predNet').className='pred-big '+(level>=0?'pos':'neg');
-  $('predDelta').textContent=(pred>0?'+':'')+fmtNum(pred,0);$('predDelta').className='pred-big '+(pred>=0?'pos':'neg');
-  $('predR2').textContent=fmtPct(bestModel.model.r2);
-  $('predModelName').textContent=bestModel.name+' (n='+bestModel.model.n+')';
+  var predSec=$('predictionSection');
+  if(predSec)predSec.style.display='block';
+  var pNet=$('predNet');
+  if(pNet){pNet.textContent=fmtNum(level,0);pNet.className='pred-big '+(level>=0?'pos':'neg');}
+  var pDelta=$('predDelta');
+  if(pDelta){pDelta.textContent=(pred>0?'+':'')+fmtNum(pred,0);pDelta.className='pred-big '+(pred>=0?'pos':'neg');}
+  var pR2=$('predR2');
+  if(pR2)pR2.textContent=fmtPct(bestModel.model.r2);
+  var pName=$('predModelName');
+  if(pName)pName.textContent=bestModel.name+' (n='+bestModel.model.n+')';
 
   var featHtml='<table><thead><tr><th>Feature</th><th>Value</th></tr></thead><tbody>';
   bestModel.features.forEach(function(fn){
@@ -1035,7 +1067,8 @@ function predictNextCot(){
     featHtml+='<tr><td>'+fn+'</td><td class="num">'+fmtNum(val,2)+'</td></tr>';
   });
   featHtml+='</tbody></table>';
-  $('predFeatures').innerHTML=featHtml;
+  var featEl=$('predFeatures');
+  if(featEl)featEl.innerHTML=featHtml;
 
   var detHtml='<div class="model-card best">';
   detHtml+='<div class="model-title">'+bestModel.name+'</div>';
@@ -1046,7 +1079,8 @@ function predictNextCot(){
   detHtml+='<div style="margin-top:6px;font-size:0.72rem;"><strong>Coefficients:</strong> ';
   for(var i=0;i<bestModel.model.names.length;i++){detHtml+=bestModel.model.names[i]+'='+fmtNum(bestModel.model.beta[i],4)+(i<bestModel.model.names.length-1?', ':'');}
   detHtml+='</div></div>';
-  $('predModelDetails').innerHTML=detHtml;
+  var detEl=$('predModelDetails');
+  if(detEl)detEl.innerHTML=detHtml;
 }
 
 /* ===========================================================
@@ -1092,10 +1126,15 @@ function runBacktest(){
 }
 
 function renderBacktest(results,model){
-  $('backtestSection').style.display='block';
+  var btSec=$('backtestSection');
+  if(btSec)btSec.style.display='block';
 
-  var ctx=$('backtestChart').getContext('2d');if(charts.backtest)charts.backtest.destroy();
-  charts.backtest=new Chart(ctx,{type:'bar',data:{labels:results.map(function(r){return fmtDate(r.date);}),datasets:[{label:'Actual Δ',data:results.map(function(r){return r.actualDelta;}),backgroundColor:'rgba(42,82,152,0.7)'},{label:'Predicted Δ',data:results.map(function(r){return r.predictedDelta;}),backgroundColor:'rgba(212,136,15,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Last 4 Weeks: Actual vs Predicted'}},scales:{y:{title:{display:true,text:'Contracts'}}}}});
+  var ctx=$('backtestChart');
+  if(ctx){
+    ctx=ctx.getContext('2d');
+    if(charts.backtest)charts.backtest.destroy();
+    charts.backtest=new Chart(ctx,{type:'bar',data:{labels:results.map(function(r){return fmtDate(r.date);}),datasets:[{label:'Actual Δ',data:results.map(function(r){return r.actualDelta;}),backgroundColor:'rgba(42,82,152,0.7)'},{label:'Predicted Δ',data:results.map(function(r){return r.predictedDelta;}),backgroundColor:'rgba(212,136,15,0.7)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Last 4 Weeks: Actual vs Predicted'}},scales:{y:{title:{display:true,text:'Contracts'}}}}});
+  }
 
   var tbl='';
   var totalAbsErr=0,dirCorrect=0;
@@ -1105,11 +1144,13 @@ function renderBacktest(results,model){
     var errClass=Math.abs(r.error)<1000?'actual-good':Math.abs(r.error)<3000?'actual-ok':'actual-bad';
     tbl+='<tr><td>'+fmtDate(r.date)+'</td><td class="num '+(r.actualDelta>=0?'pos':'neg')+'">'+(r.actualDelta>0?'+':'')+fmtNum(r.actualDelta,0)+'</td><td class="num '+(r.predictedDelta>=0?'pos':'neg')+'">'+(r.predictedDelta>0?'+':'')+fmtNum(r.predictedDelta,0)+'</td><td class="num '+errClass+'">'+(r.error>0?'+':'')+fmtNum(r.error,0)+'</td><td>'+r.direction+'</td><td class="num">'+fmtNum(r.actualLevel,0)+'</td><td class="num">'+fmtNum(r.predictedLevel,0)+'</td></tr>';
   });
-  $('backtestTable').innerHTML=tbl;
+  var btTbl=$('backtestTable');
+  if(btTbl)btTbl.innerHTML=tbl;
 
   var mae=totalAbsErr/results.length;
   var dirAcc=(dirCorrect/results.length*100).toFixed(0);
-  $('backtestSummary').innerHTML='<div class="grid"><div class="card"><div class="metric"><strong>MAE:</strong> '+fmtNum(mae,0)+'</div></div><div class="card"><div class="metric"><strong>Direction Acc:</strong> '+dirAcc+'%</div></div><div class="card"><div class="metric"><strong>Model R2:</strong> '+fmtPct(model.r2)+'</div></div></div>';
+  var btSum=$('backtestSummary');
+  if(btSum)btSum.innerHTML='<div class="grid"><div class="card"><div class="metric"><strong>MAE:</strong> '+fmtNum(mae,0)+'</div></div><div class="card"><div class="metric"><strong>Direction Acc:</strong> '+dirAcc+'%</div></div><div class="card"><div class="metric"><strong>Model R2:</strong> '+fmtPct(model.r2)+'</div></div></div>';
 
   var modHtml='';
   if(models&&models.models){
@@ -1121,21 +1162,29 @@ function renderBacktest(results,model){
       modHtml+='</div>';
     });
   }
-  $('backtestModels').innerHTML=modHtml;
+  var btModels=$('backtestModels');
+  if(btModels)btModels.innerHTML=modHtml;
 }
 
 /* ===========================================================
    MODEL COMPARISON TAB
    =========================================================== */
 function renderModelComparison(){
-  if(!models||!models.models.length){$('modelsLoading').style.display='block';$('modelsContent').style.display='none';return;}
-  $('modelsLoading').style.display='none';$('modelsContent').style.display='block';
+  if(!models||!models.models.length){var mLoad=$('modelsLoading');var mCont=$('modelsContent');if(mLoad)mLoad.style.display='block';if(mCont)mCont.style.display='none';return;}
+  var mLoad=$('modelsLoading');var mCont=$('modelsContent');
+  if(mLoad)mLoad.style.display='none';
+  if(mCont)mCont.style.display='block';
 
-  var ctx=$('modelChart').getContext('2d');if(charts.model)charts.model.destroy();
-  charts.model=new Chart(ctx,{type:'bar',data:{labels:models.models.map(function(m){return m.name;}),datasets:[{label:'R2',data:models.models.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},{label:'Dir Acc',data:models.models.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'linear',display:true,position:'left',title:{display:true,text:'R2'},min:0,max:1},y1:{type:'linear',display:true,position:'right',title:{display:true,text:'Dir Acc'},min:0,max:1,grid:{drawOnChartArea:false}}}}});
+  var ctx=$('modelChart');
+  if(ctx){
+    ctx=ctx.getContext('2d');
+    if(charts.model)charts.model.destroy();
+    charts.model=new Chart(ctx,{type:'bar',data:{labels:models.models.map(function(m){return m.name;}),datasets:[{label:'R2',data:models.models.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},{label:'Dir Acc',data:models.models.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{type:'linear',display:true,position:'left',title:{display:true,text:'R2'},min:0,max:1},y1:{type:'linear',display:true,position:'right',title:{display:true,text:'Dir Acc'},min:0,max:1,grid:{drawOnChartArea:false}}}}});
+  }
 
   var cards='';models.models.forEach(function(m){cards+='<div class="model-card">';cards+='<div class="model-title">'+m.name+'</div>';cards+='<div class="model-stat"><strong>R2:</strong> '+fmtPct(m.model.r2)+'</div>';cards+='<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>';cards+='<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>';cards+='<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>';cards+='</div>';});
-  $('modelCards').innerHTML=cards;
+  var mCards=$('modelCards');
+  if(mCards)mCards.innerHTML=cards;
 }
 
 /* ===========================================================
@@ -1144,7 +1193,9 @@ function renderModelComparison(){
 function switchTab(id){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.tab-body').forEach(function(b){b.classList.remove('active');});
-  event.target.classList.add('active');$(id).classList.add('active');
+  event.target.classList.add('active');
+  var el=$(id);
+  if(el)el.classList.add('active');
 }
 
 /* ===========================================================
@@ -1152,13 +1203,39 @@ function switchTab(id){
    =========================================================== */
 function renderDebug(){
   if(!mergedHistory.length)return;
-  $('debugLoading').style.display='none';$('debugContent').style.display='block';
-  var summary='';summary+='<p><strong>OI Records:</strong> '+oiData.length+'</p>';summary+='<p><strong>COT History:</strong> '+cotHistory.length+'</p>';summary+='<p><strong>Merged History:</strong> '+mergedHistory.length+'</p>';$('debugSummary').innerHTML=summary;
-  if(latestWeekData)$('debugLatest').textContent=JSON.stringify(latestWeekData,null,2);
-  if(cotHistory.length)$('debugCot').textContent=JSON.stringify(cotHistory.slice(0,5),null,2);
+  var dLoad=$('debugLoading');
+  var dCont=$('debugContent');
+  if(dLoad)dLoad.style.display='none';
+  if(dCont)dCont.style.display='block';
+  var summary='';summary+='<p><strong>OI Records:</strong> '+oiData.length+'</p>';summary+='<p><strong>COT History:</strong> '+cotHistory.length+'</p>';summary+='<p><strong>Merged History:</strong> '+mergedHistory.length+'</p>';
+  var dSum=$('debugSummary');
+  if(dSum)dSum.innerHTML=summary;
+  if(latestWeekData){var dLat=$('debugLatest');if(dLat)dLat.textContent=JSON.stringify(latestWeekData,null,2);}
+  if(cotHistory.length){var dCot=$('debugCot');if(dCot)dCot.textContent=JSON.stringify(cotHistory.slice(0,5),null,2);}
 }
 
-$('cotHistoryInput').addEventListener('input',function(){if(this.value.trim())parseCotHistory();});
+/* ===========================================================
+   DOM READY — Attach event listeners
+   =========================================================== */
+document.addEventListener('DOMContentLoaded',function(){
+  var dropZone=$('dropZone');
+  var fileInput=$('csvFileInput');
+  var cotInput=$('cotHistoryInput');
+
+  if(dropZone&&fileInput){
+    dropZone.addEventListener('click',function(){fileInput.click();});
+    dropZone.addEventListener('dragover',function(e){e.preventDefault();this.classList.add('dragover');});
+    dropZone.addEventListener('dragleave',function(e){e.preventDefault();this.classList.remove('dragover');});
+    dropZone.addEventListener('drop',function(e){e.preventDefault();this.classList.remove('dragover');var f=e.dataTransfer.files[0];if(f&&f.name.toLowerCase().endsWith('.csv')){handleCsvFile(f);}else{showStatus('csvParseStatus','Please drop a .csv file','err');}});
+    fileInput.addEventListener('change',function(e){var f=e.target.files[0];if(f)handleCsvFile(f);});
+  }
+
+  if(cotInput){
+    cotInput.addEventListener('input',function(){if(this.value.trim())parseCotHistory();});
+  }
+
+  console.log('COT Estimator ready. Upload CSV to begin.');
+});
 </script>
 
 </body>
