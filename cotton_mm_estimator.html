@@ -515,13 +515,21 @@ function getFrontMonthOI(row,date){
   var v=row[active+' Comdty OPEN_INT'];
   return(v!=null&&!isNaN(v))?v:null;
 }
-function getCombinedOI(row){
+function getTotalOI(row){
+  // Sum ALL contract months — used for total market OI level
   var sum=0,cnt=0;
   for(var i=0;i<CONTRACT_PREFIXES.length;i++){
     var v=row[CONTRACT_PREFIXES[i]+' Comdty OPEN_INT'];
     if(v!=null&&!isNaN(v)){sum+=v;cnt++;}
   }
   return cnt>0?sum:null;
+}
+function getBackMonthsOI(row,date){
+  // Total OI minus front month OI — orthogonal to frontMonthOI
+  var total=getTotalOI(row);
+  var front=getFrontMonthOI(row,date);
+  if(total==null)return null;
+  return total-(front||0);
 }
 
 function getFrontMonthVol(row,date){
@@ -542,7 +550,8 @@ function getFrontMonthVol(row,date){
   }
   return null;
 }
-function getCombinedVol(row){
+function getTotalVol(row){
+  // Sum volume across ALL contract months
   if(!hasVolume)return null;
   var sum=0,cnt=0;
   var suffixes=['Comdty VOLUME','Comdty PX_VOLUME','Comdty VOL'];
@@ -552,7 +561,6 @@ function getCombinedVol(row){
       if(v!=null&&!isNaN(v)){sum+=v;cnt++;break;}
     }
   }
-  // Fallback: any detected vol col
   if(cnt===0){
     for(var i=0;i<detectedVolCols.length;i++){
       var v=row[detectedVolCols[i]];
@@ -560,6 +568,13 @@ function getCombinedVol(row){
     }
   }
   return cnt>0?sum:null;
+}
+function getBackMonthsVol(row,date){
+  // Total vol minus front month vol — orthogonal to frontMonthVol
+  var total=getTotalVol(row);
+  var front=getFrontMonthVol(row,date);
+  if(total==null)return null;
+  return total-(front||0);
 }
 
 /* ===========================================================
@@ -609,26 +624,36 @@ function getCotWeekStart(cotTuesdayDate){
 }
 
 function buildDailyFeatures(weekRows, volOiThresh){
-  // weekRows: array of daily OI rows sorted ascending, covering Wed–Tue
+  // weekRows: daily OI rows sorted ascending, covering Wed–Tue
   if(!weekRows||weekRows.length<1)return null;
 
-  var frontOiVals=[], combOiVals=[], frontVolVals=[], combVolVals=[], priceVals=[], dates=[];
+  // Per-day arrays — ORTHOGONAL OI split:
+  //   frontOiVals  = front month OI only
+  //   backOiVals   = total OI MINUS front month (deferred/spreading activity)
+  //   totalOiVals  = front + back (used only for transfer threshold, not as a regression feature)
+  var frontOiVals=[], backOiVals=[], totalOiVals=[];
+  var frontVolVals=[], backVolVals=[], totalVolVals=[];
+  var priceVals=[];
+
   weekRows.forEach(function(r){
-    var d=parseDate(r[OI_DATE_COL]);
-    if(!d)return;
-    dates.push(d);
-    var fOI=getFrontMonthOI(r,r[OI_DATE_COL]);
-    var cOI=getCombinedOI(r);
-    var fVol=getFrontMonthVol(r,r[OI_DATE_COL]);
-    var cVol=getCombinedVol(r);
-    var active=getActiveContract(r[OI_DATE_COL]);
+    var date=r[OI_DATE_COL];
+    var fOI=getFrontMonthOI(r,date);
+    var tOI=getTotalOI(r);
+    var bOI=(tOI!=null)?tOI-(fOI||0):null;
+    var fVol=getFrontMonthVol(r,date);
+    var tVol=getTotalVol(r);
+    var bVol=(tVol!=null)?tVol-(fVol||0):null;
+    var active=getActiveContract(date);
     var price=r[active+' Comdty PX_LAST'];
-    frontOiVals.push(fOI);combOiVals.push(cOI);
-    frontVolVals.push(fVol);combVolVals.push(cVol);
+    frontOiVals.push(fOI);
+    backOiVals.push(bOI);
+    totalOiVals.push(tOI);
+    frontVolVals.push(fVol);
+    backVolVals.push(bVol);
+    totalVolVals.push(tVol);
     priceVals.push(price!=null?parseFloat(price):null);
   });
 
-  // Week-level OI deltas (end - start, ignoring nulls)
   function weekDelta(arr){
     var first=null,last=null;
     for(var i=0;i<arr.length;i++)if(arr[i]!=null){first=arr[i];break;}
@@ -636,97 +661,169 @@ function buildDailyFeatures(weekRows, volOiThresh){
     return(first!=null&&last!=null)?last-first:null;
   }
   function weekSum(arr){
-    var s=0,cnt=0;for(var i=0;i<arr.length;i++)if(arr[i]!=null){s+=arr[i];cnt++;}
+    var s=0,cnt=0;arr.forEach(function(v){if(v!=null){s+=v;cnt++;}});
     return cnt>0?s:null;
   }
   function weekMean(arr){
-    var s=0,cnt=0;for(var i=0;i<arr.length;i++)if(arr[i]!=null){s+=arr[i];cnt++;}
+    var s=0,cnt=0;arr.forEach(function(v){if(v!=null){s+=v;cnt++;}});
     return cnt>0?s/cnt:null;
   }
-  function std(arr){
+  function localStd(arr){
     var v=arr.filter(function(x){return x!=null;});
     if(v.length<2)return 0;
     var m=v.reduce(function(a,b){return a+b;},0)/v.length;
     return Math.sqrt(v.reduce(function(a,b){return a+Math.pow(b-m,2);},0)/(v.length-1));
   }
 
-  var frontOiDelta=weekDelta(frontOiVals);
-  var combOiDelta=weekDelta(combOiVals);
-  var totalFrontVol=weekSum(frontVolVals);
-  var totalCombVol=weekSum(combVolVals);
-  var priceDelta=weekDelta(priceVals);
-  var priceLevel=priceVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
-  var frontOiLevel=frontOiVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
-  var combOiLevel=combOiVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
+  // --- WEEK-LEVEL DELTAS (orthogonal) ---
+  var frontOiDelta  = weekDelta(frontOiVals);   // Δ front month OI
+  var backOiDelta   = weekDelta(backOiVals);     // Δ deferred months OI  (independent of front)
+  var totalOiDelta  = weekDelta(totalOiVals);    // Δ total OI (front+back) — for reference/display only
+  var priceDelta    = weekDelta(priceVals);
 
-  // Vol/OI ratio — total week volume divided by average OI
-  var avgFrontOI=weekMean(frontOiVals)||1;
-  var avgCombOI=weekMean(combOiVals)||1;
-  var frontVolOiRatio=(totalFrontVol!=null)?totalFrontVol/avgFrontOI:null;
-  var combVolOiRatio=(totalCombVol!=null)?totalCombVol/avgCombOI:null;
+  // Week vol sums
+  var totalFrontVol = weekSum(frontVolVals);
+  var totalBackVol  = weekSum(backVolVals);
+  var totalVol      = weekSum(totalVolVals);
 
-  // DAILY transfer signals — count days where vol/oi > threshold AND |ΔOI| < 5% of avg OI
+  // OI levels at end of week
+  var frontOiLevel  = frontOiVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
+  var backOiLevel   = backOiVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
+  var totalOiLevel  = totalOiVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
+  var priceLevel    = priceVals.filter(function(x){return x!=null;}).slice(-1)[0]||null;
+
+  // Average OI for threshold scaling
+  var avgFrontOI = weekMean(frontOiVals)||1;
+  var avgTotalOI = weekMean(totalOiVals)||1;
+
+  // Weekly Vol/OI ratios — front and total (independent)
+  var frontVolOiRatio = (totalFrontVol!=null) ? totalFrontVol/avgFrontOI : null;
+  var totalVolOiRatio = (totalVol!=null)       ? totalVol/avgTotalOI     : null;
+
+  // Front/back OI divergence: front and back moving in OPPOSITE directions
+  // signals rolling/spreading between spec & commercial, not pure directional position change
+  var frontBackOiDivergence = 0;
+  if(frontOiDelta!=null&&backOiDelta!=null){
+    if((frontOiDelta>0&&backOiDelta<0)||(frontOiDelta<0&&backOiDelta>0))
+      frontBackOiDivergence = 1;  // spreading/rolling activity
+    else if((frontOiDelta>0&&backOiDelta>0)||(frontOiDelta<0&&backOiDelta<0))
+      frontBackOiDivergence = -1; // genuine directional build/liquidation across curve
+  }
+
+  // --- DAILY TRANSFER DETECTION ---
+  // Uses TOTAL OI (front+back) and TOTAL volume — catches transfers in both delivery months
+  // Transfer day: high total vol/OI ratio AND flat total OI (within 2% of avg total OI)
   var transferDays=0, upVolFlatOI=0, downVolFlatOI=0;
   var dailyDetails=[];
+
   for(var i=1;i<weekRows.length;i++){
-    var r=weekRows[i],rPrev=weekRows[i-1];
+    var r=weekRows[i];
     var d=parseDate(r[OI_DATE_COL]);
-    var fOI=frontOiVals[i], pOI=frontOiVals[i-1];
+    var fOI=frontOiVals[i],   pFrontOI=frontOiVals[i-1];
+    var tOI=totalOiVals[i],   pTotalOI=totalOiVals[i-1];
+    var bOI=backOiVals[i],    pBackOI=backOiVals[i-1];
     var fVol=frontVolVals[i];
-    var price=priceVals[i], prevPrice=priceVals[i-1];
-    var dOI=(fOI!=null&&pOI!=null)?fOI-pOI:null;
-    var dPrice=(price!=null&&prevPrice!=null)?price-prevPrice:null;
-    var dayVolOI=(fVol!=null&&fOI!=null&&fOI>0)?fVol/fOI:null;
-    var isTransfer=false;
-    if(dayVolOI!=null&&dayVolOI>volOiThresh&&dOI!=null&&Math.abs(dOI)<avgFrontOI*0.02){
-      isTransfer=true;transferDays++;
-      if(dPrice!=null&&dPrice>0)upVolFlatOI++;
-      if(dPrice!=null&&dPrice<0)downVolFlatOI++;
+    var tVol=totalVolVals[i];
+    var price=priceVals[i],   prevPrice=priceVals[i-1];
+
+    var dFrontOI = (fOI!=null&&pFrontOI!=null) ? fOI-pFrontOI : null;
+    var dTotalOI = (tOI!=null&&pTotalOI!=null) ? tOI-pTotalOI : null;
+    var dBackOI  = (bOI!=null&&pBackOI!=null)  ? bOI-pBackOI  : null;
+    var dPrice   = (price!=null&&prevPrice!=null) ? price-prevPrice : null;
+
+    // Day-level Vol/OI ratios (front and total)
+    var dayFrontVolOI = (fVol!=null&&fOI!=null&&fOI>0) ? fVol/fOI : null;
+    var dayTotalVolOI = (tVol!=null&&tOI!=null&&tOI>0) ? tVol/tOI : null;
+
+    // Transfer: high TOTAL vol/OI AND flat TOTAL OI (spec↔commercial handoff across all months)
+    var isTransfer = false;
+    if(dayTotalVolOI!=null && dayTotalVolOI>volOiThresh &&
+       dTotalOI!=null && Math.abs(dTotalOI)<avgTotalOI*0.02){
+      isTransfer=true; transferDays++;
+      if(dPrice!=null&&dPrice>0) upVolFlatOI++;
+      if(dPrice!=null&&dPrice<0) downVolFlatOI++;
     }
+
     dailyDetails.push({
-      date:d,dayName:d?['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]:'?',
-      frontOI:fOI,frontVol:fVol,price:price,dOI:dOI,dPrice:dPrice,
-      dayVolOI:dayVolOI,isTransfer:isTransfer
+      date:d,
+      dayName:d?['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]:'?',
+      frontOI:fOI, backOI:bOI, totalOI:tOI,
+      frontVol:fVol, totalVol:tVol,
+      price:price, dFrontOI:dFrontOI, dBackOI:dBackOI, dTotalOI:dTotalOI, dPrice:dPrice,
+      dayFrontVolOI:dayFrontVolOI, dayTotalVolOI:dayTotalVolOI,
+      isTransfer:isTransfer
     });
   }
 
-  // Momentum: cumulative OI change direction consistency
-  var daysOIup=0,daysOIdown=0;
-  for(var i=0;i<dailyDetails.length;i++){
-    if(dailyDetails[i].dOI>0)daysOIup++;
-    else if(dailyDetails[i].dOI<0)daysOIdown++;
-  }
-  var oiMomentum=(daysOIup-daysOIdown)/(dailyDetails.length||1); // -1 to +1
+  // OI momentum: based on front month daily direction consistency (-1 to +1)
+  var daysOIup=0, daysOIdown=0;
+  dailyDetails.forEach(function(dd){
+    if(dd.dFrontOI>0) daysOIup++;
+    else if(dd.dFrontOI<0) daysOIdown++;
+  });
+  var oiMomentum = (daysOIup-daysOIdown)/(dailyDetails.length||1);
 
-  // Price-OI divergence: did price go up but OI went down (or vice versa)?
-  var priceOIDivergence=0;
+  // Back-month OI momentum (independent direction signal)
+  var daysBackUp=0, daysBackDown=0;
+  dailyDetails.forEach(function(dd){
+    if(dd.dBackOI>0) daysBackUp++;
+    else if(dd.dBackOI<0) daysBackDown++;
+  });
+  var backOiMomentum = (daysBackUp-daysBackDown)/(dailyDetails.length||1);
+
+  // Price vs front OI divergence (short-covering vs genuine buying signal)
+  var priceOIDivergence = 0;
   if(priceDelta!=null&&frontOiDelta!=null){
-    if((priceDelta>0&&frontOiDelta<0)||(priceDelta<0&&frontOiDelta>0))priceOIDivergence=1;
-    else if((priceDelta>0&&frontOiDelta>0)||(priceDelta<0&&frontOiDelta<0))priceOIDivergence=-1;
+    if((priceDelta>0&&frontOiDelta<0)||(priceDelta<0&&frontOiDelta>0)) priceOIDivergence=1;
+    else if((priceDelta>0&&frontOiDelta>0)||(priceDelta<0&&frontOiDelta<0)) priceOIDivergence=-1;
   }
 
-  // Signed vol signals: high-vol up days vs high-vol down days
-  var highVolUpDays=0,highVolDownDays=0;
-  for(var i=0;i<dailyDetails.length;i++){
-    var dd=dailyDetails[i];
-    if(dd.dayVolOI!=null&&dd.dayVolOI>volOiThresh){
-      if(dd.dPrice>0)highVolUpDays++;
-      if(dd.dPrice<0)highVolDownDays++;
+  // High-vol directional days (using total vol/OI for consistency with transfer logic)
+  var highVolUpDays=0, highVolDownDays=0;
+  dailyDetails.forEach(function(dd){
+    if(dd.dayTotalVolOI!=null&&dd.dayTotalVolOI>volOiThresh){
+      if(dd.dPrice>0) highVolUpDays++;
+      if(dd.dPrice<0) highVolDownDays++;
     }
-  }
+  });
 
   return{
-    frontOiDelta,combOiDelta,totalFrontVol,totalCombVol,
-    frontVolOiRatio,combVolOiRatio,
-    priceDelta,priceLevel,frontOiLevel,combOiLevel,
-    transferDays,upVolFlatOI,downVolFlatOI,
-    transferScore:upVolFlatOI-downVolFlatOI, // positive = bullish transfers
-    oiMomentum,priceOIDivergence,
-    highVolUpDays,highVolDownDays,
-    highVolDirectionScore:highVolUpDays-highVolDownDays,
-    frontOiStd:std(frontOiVals.filter(function(x){return x!=null;})),
-    combOiStd:std(combOiVals.filter(function(x){return x!=null;})),
-    days:weekRows.length,
+    // Primary regression features — ORTHOGONAL OI split
+    frontOiDelta,           // front month OI Δ
+    backOiDelta,            // deferred months OI Δ (independent)
+    totalOiDelta,           // front+back (display only, not a regression feature to avoid collinearity)
+    priceDelta,
+
+    // Vol features
+    totalFrontVol,
+    totalBackVol,
+    totalVol,
+    frontVolOiRatio,        // front vol relative to front OI
+    totalVolOiRatio,        // total vol relative to total OI
+
+    // OI levels
+    frontOiLevel, backOiLevel, totalOiLevel, priceLevel,
+
+    // Transfer & direction signals
+    transferDays,
+    upVolFlatOI, downVolFlatOI,
+    transferScore: upVolFlatOI-downVolFlatOI,
+
+    // Momentum
+    oiMomentum,             // front OI daily direction consistency
+    backOiMomentum,         // back OI daily direction consistency
+    priceOIDivergence,      // price vs front OI relationship
+    frontBackOiDivergence,  // front vs back OI moving same/opposite direction
+
+    // High-vol day signals
+    highVolUpDays, highVolDownDays,
+    highVolDirectionScore: highVolUpDays-highVolDownDays,
+
+    // Std dev
+    frontOiStd: localStd(frontOiVals.filter(function(x){return x!=null;})),
+    backOiStd:  localStd(backOiVals.filter(function(x){return x!=null;})),
+
+    days: weekRows.length,
     dailyDetails
   };
 }
@@ -853,21 +950,21 @@ function buildModels(){
   var yLong=td.map(function(d){return d.mm_long_delta;});
   var yShort=td.map(function(d){return d.mm_short_delta;});
 
-  // Base feature sets
-  var baseOI=['frontOiDelta','combOiDelta'];
-  var withPrice=['frontOiDelta','combOiDelta','priceDelta'];
-  var withVol=hasVolume?['frontOiDelta','combOiDelta','totalFrontVol','frontVolOiRatio']:null;
-  var withVolPrice=hasVolume?['frontOiDelta','combOiDelta','priceDelta','totalFrontVol','frontVolOiRatio']:null;
-  var withTransfer=hasVolume?['frontOiDelta','combOiDelta','priceDelta','transferDays','transferScore','highVolDirectionScore']:null;
+  // Base feature sets — frontOiDelta + backOiDelta are ORTHOGONAL (no collinearity)
+  var baseOI=['frontOiDelta','backOiDelta'];
+  var withPrice=['frontOiDelta','backOiDelta','priceDelta'];
+  var withVol=hasVolume?['frontOiDelta','backOiDelta','totalFrontVol','frontVolOiRatio','totalVolOiRatio']:null;
+  var withVolPrice=hasVolume?['frontOiDelta','backOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','totalVolOiRatio']:null;
+  var withTransfer=hasVolume?['frontOiDelta','backOiDelta','priceDelta','transferDays','transferScore','highVolDirectionScore','frontBackOiDivergence']:null;
   var fullFeatures=hasVolume
-    ?['frontOiDelta','combOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','transferDays','transferScore','highVolDirectionScore','oiMomentum','priceOIDivergence','mm_net_lag1']
-    :['frontOiDelta','combOiDelta','priceDelta','oiMomentum','priceOIDivergence','mm_net_lag1'];
+    ?['frontOiDelta','backOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','totalVolOiRatio','transferDays','transferScore','highVolDirectionScore','oiMomentum','backOiMomentum','priceOIDivergence','frontBackOiDivergence','mm_net_lag1']
+    :['frontOiDelta','backOiDelta','priceDelta','oiMomentum','backOiMomentum','priceOIDivergence','frontBackOiDivergence','mm_net_lag1'];
   var fullFeaturesLong=hasVolume
-    ?['frontOiDelta','combOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','highVolUpDays','upVolFlatOI','oiMomentum','mm_long_lag1']
-    :['frontOiDelta','combOiDelta','priceDelta','oiMomentum','mm_long_lag1'];
+    ?['frontOiDelta','backOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','totalVolOiRatio','highVolUpDays','upVolFlatOI','oiMomentum','backOiMomentum','frontBackOiDivergence','mm_long_lag1']
+    :['frontOiDelta','backOiDelta','priceDelta','oiMomentum','backOiMomentum','frontBackOiDivergence','mm_long_lag1'];
   var fullFeaturesShort=hasVolume
-    ?['frontOiDelta','combOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','highVolDownDays','downVolFlatOI','oiMomentum','mm_short_lag1']
-    :['frontOiDelta','combOiDelta','priceDelta','oiMomentum','mm_short_lag1'];
+    ?['frontOiDelta','backOiDelta','priceDelta','totalFrontVol','frontVolOiRatio','totalVolOiRatio','highVolDownDays','downVolFlatOI','oiMomentum','backOiMomentum','frontBackOiDivergence','mm_short_lag1']
+    :['frontOiDelta','backOiDelta','priceDelta','oiMomentum','backOiMomentum','frontBackOiDivergence','mm_short_lag1'];
 
   function runModel(y,spec,name){
     var X=td.map(function(d){return buildFeatureVector(d,spec);});
@@ -977,8 +1074,11 @@ function buildSignals(feats){
   // Price vs OI
   if(feats.priceOIDivergence===1)signals.push({label:'Price↑ OI↓',type:'bearish',desc:'Price up but OI falling = short covering rally, not new buying'});
   if(feats.priceOIDivergence===-1)signals.push({label:'Price↑ OI↑',type:'bullish',desc:'Price up with OI rising = new longs confirmed'});
-  // Transfer signals
-  if(hasVolume&&feats.transferDays>0){
+  // Front vs Back OI divergence
+  if(feats.frontBackOiDivergence===1)
+    signals.push({label:'Front/Back Spread',type:'transfer',desc:'Front and back months moving opposite directions — spreading/rolling between specs and commercials'});
+  if(feats.frontBackOiDivergence===-1)
+    signals.push({label:'Curve-Wide Move',type:'bullish',desc:'Front and back OI moving same direction — genuine directional positioning across the whole curve'});
     var tType=feats.transferScore>0?'bullish':feats.transferScore<0?'bearish':'neutral';
     signals.push({label:'Transfer Days: '+feats.transferDays,type:'transfer',desc:'High vol / flat OI days — position handoff between trader categories. Score: '+(feats.transferScore>0?'+':'')+feats.transferScore});
   }
@@ -1036,18 +1136,26 @@ function renderPrediction(pr){
 
   // Weekly feature table
   var rows=[
-    ['Front OI Δ',fmtNum(latest.frontOiDelta,0)],
-    ['Combined OI Δ',fmtNum(latest.combOiDelta,0)],
+    ['Front Month OI Δ',fmtNum(latest.frontOiDelta,0)],
+    ['Back Months OI Δ (excl. front)',fmtNum(latest.backOiDelta,0)],
+    ['Total OI Δ (front+back, display)',fmtNum(latest.totalOiDelta,0)],
     ['Price Δ',fmtNum(latest.priceDelta,2)+'¢'],
+    ['Front/Back OI Divergence',latest.frontBackOiDivergence===1?'Spread/Roll':latest.frontBackOiDivergence===-1?'Directional':'Neutral'],
+    ['Price vs Front OI',latest.priceOIDivergence===1?'Diverging (cover?)':latest.priceOIDivergence===-1?'Confirmed':'Neutral'],
   ];
   if(hasVolume)rows=rows.concat([
     ['Total Front Vol',fmtK(latest.totalFrontVol)],
+    ['Total Back Vol',fmtK(latest.totalBackVol)],
     ['Front Vol/OI Ratio',fmtNum(latest.frontVolOiRatio,2)],
-    ['Transfer Days',fmtNum(latest.transferDays,0)],
+    ['Total Vol/OI Ratio',fmtNum(latest.totalVolOiRatio,2)],
+    ['Transfer Days (total OI flat)',fmtNum(latest.transferDays,0)],
     ['Transfer Score',fmtNum(latest.transferScore,0)],
     ['High-Vol Direction Score',fmtNum(latest.highVolDirectionScore,0)],
   ]);
-  rows=rows.concat([['OI Momentum',fmtNum(latest.oiMomentum,2)],['Price/OI Divergence',latest.priceOIDivergence>0?'Yes (div)':latest.priceOIDivergence<0?'Confirmed':'—']]);
+  rows=rows.concat([
+    ['Front OI Momentum',fmtNum(latest.oiMomentum,2)],
+    ['Back OI Momentum',fmtNum(latest.backOiMomentum,2)],
+  ]);
   var ht='<table><thead><tr><th>Feature</th><th>This Week</th></tr></thead><tbody>';
   rows.forEach(function(r){ht+='<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td></tr>';});
   $('oiBreakdown').innerHTML=ht+'</tbody></table>';
@@ -1080,10 +1188,11 @@ function renderDailyBreakdown(pr){
       var cls='day-cell'+(dd.isTransfer?' vol-oi-high':'');
       html+='<div class="'+cls+'">';
       html+='<div class="day-name">'+dd.dayName+' '+fmtDate(dd.date).slice(5)+(dd.isTransfer?' 🔀':'')+'</div>';
-      html+='<div class="day-oi">ΔOI: '+(dd.dOI!=null?(dd.dOI>0?'+':'')+fmtK(dd.dOI):'—')+'</div>';
-      if(hasVolume)html+='<div class="day-vol">Vol: '+(dd.frontVol!=null?fmtK(dd.frontVol):'—')+'</div>';
+      html+='<div class="day-oi">ΔFront: '+(dd.dFrontOI!=null?(dd.dFrontOI>0?'+':'')+fmtK(dd.dFrontOI):'—')+'</div>';
+      html+='<div class="day-oi" style="color:var(--acc2);">ΔBack: '+(dd.dBackOI!=null?(dd.dBackOI>0?'+':'')+fmtK(dd.dBackOI):'—')+'</div>';
+      if(hasVolume)html+='<div class="day-vol">TVol: '+(dd.totalVol!=null?fmtK(dd.totalVol):'—')+'</div>';
       html+='<div class="day-price">ΔP: '+(dd.dPrice!=null?(dd.dPrice>0?'+':'')+dd.dPrice.toFixed(2)+'¢':'—')+'</div>';
-      if(hasVolume)html+='<div class="day-ratio">V/OI: '+(dd.dayVolOI!=null?dd.dayVolOI.toFixed(1):'—')+'</div>';
+      if(hasVolume)html+='<div class="day-ratio">T.V/OI: '+(dd.dayTotalVolOI!=null?dd.dayTotalVolOI.toFixed(1):'—')+'</div>';
       html+='</div>';
     });
     html+='</div>';
@@ -1094,14 +1203,15 @@ function renderDailyBreakdown(pr){
   var prev=pr.prev;
   $('priorDailyGrid').innerHTML=prev&&prev.dailyDetails?buildDailyGridHtml(prev.dailyDetails):'<p style="color:#999;">No prior week data.</p>';
 
-  // Daily chart
+  // Daily chart — front OI, back OI and price on separate axes
   var details=pr.latest.dailyDetails;
   var labels=details.map(function(d){return d.dayName+' '+fmtDate(d.date).slice(5);});
   var datasets=[
-    {label:'ΔOI (front)',data:details.map(function(d){return d.dOI||0;}),borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.15)',yAxisID:'y',type:'bar'},
-    {label:'ΔPrice (¢)',data:details.map(function(d){return d.dPrice||0;}),borderColor:'#d4880f',type:'line',yAxisID:'y2',tension:0.2},
+    {label:'Δ Front OI',data:details.map(function(d){return d.dFrontOI||0;}),backgroundColor:'rgba(42,82,152,0.6)',yAxisID:'y',type:'bar'},
+    {label:'Δ Back Months OI',data:details.map(function(d){return d.dBackOI||0;}),backgroundColor:'rgba(26,140,78,0.5)',yAxisID:'y',type:'bar'},
+    {label:'Δ Price (¢)',data:details.map(function(d){return d.dPrice||0;}),borderColor:'#d4880f',type:'line',yAxisID:'y2',tension:0.2},
   ];
-  if(hasVolume)datasets.push({label:'Vol/OI Ratio',data:details.map(function(d){return d.dayVolOI||0;}),borderColor:'#7b2fbe',backgroundColor:'rgba(123,47,190,0.15)',type:'bar',yAxisID:'y3'});
+  if(hasVolume)datasets.push({label:'Total Vol/OI Ratio',data:details.map(function(d){return d.dayTotalVolOI||0;}),borderColor:'#7b2fbe',backgroundColor:'rgba(123,47,190,0.12)',type:'bar',yAxisID:'y3'});
 
   var ctx=$('dailyChart').getContext('2d');if(charts.daily)charts.daily.destroy();
   charts.daily=new Chart(ctx,{
@@ -1184,9 +1294,9 @@ function renderHistory(modelResult){
 function renderDataTable(){
   if(!mergedData.length){$('dataContent').style.display='none';$('dataLoading').style.display='block';return;}
   $('dataLoading').style.display='none';$('dataContent').style.display='block';
-  var hdrs=['Date','MM Net','Δ Net','Δ Long','Δ Short','Δ Front OI','Δ Comb OI','Δ Price','Front OI'];
-  if(hasVolume)hdrs=hdrs.concat(['Front Vol','Vol/OI','Transfer Days','Transfer Score']);
-  hdrs=hdrs.concat(['OI Mom','Active']);
+  var hdrs=['Date','MM Net','Δ Net','Δ Long','Δ Short','Δ Front OI','Δ Back OI','Δ Total OI','Δ Price','Front OI'];
+  if(hasVolume)hdrs=hdrs.concat(['Front Vol','Back Vol','F.Vol/OI','T.Vol/OI','Transfer Days','Transfer Score']);
+  hdrs=hdrs.concat(['F/B OI Div','Front Mom','Back Mom','Active']);
   $('dataHead').innerHTML='<tr>'+hdrs.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';
   var tb='';
   for(var i=mergedData.length-1;i>=0;i--){
@@ -1197,16 +1307,21 @@ function renderDataTable(){
     tb+='<td class="num '+(d.mm_long_delta>=0?'pos':'neg')+'">'+(d.mm_long_delta>0?'+':'')+fmtNum(d.mm_long_delta,0)+'</td>';
     tb+='<td class="num '+(d.mm_short_delta>=0?'pos':'neg')+'">'+(d.mm_short_delta>0?'+':'')+fmtNum(d.mm_short_delta,0)+'</td>';
     tb+='<td class="num '+(d.frontOiDelta>=0?'pos':'neg')+'">'+(d.frontOiDelta>0?'+':'')+fmtNum(d.frontOiDelta,0)+'</td>';
-    tb+='<td class="num '+(d.combOiDelta>=0?'pos':'neg')+'">'+(d.combOiDelta>0?'+':'')+fmtNum(d.combOiDelta,0)+'</td>';
+    tb+='<td class="num '+(d.backOiDelta>=0?'pos':'neg')+'">'+(d.backOiDelta>0?'+':'')+fmtNum(d.backOiDelta,0)+'</td>';
+    tb+='<td class="num '+(d.totalOiDelta>=0?'pos':'neg')+'">'+(d.totalOiDelta>0?'+':'')+fmtNum(d.totalOiDelta,0)+'</td>';
     tb+='<td class="num '+(d.priceDelta>=0?'pos':'neg')+'">'+(d.priceDelta>0?'+':'')+fmtNum(d.priceDelta,2)+'</td>';
     tb+='<td class="num">'+fmtNum(d.frontOiLevel,0)+'</td>';
     if(hasVolume){
       tb+='<td class="num">'+fmtK(d.totalFrontVol)+'</td>';
+      tb+='<td class="num">'+fmtK(d.totalBackVol)+'</td>';
       tb+='<td class="num">'+fmtNum(d.frontVolOiRatio,2)+'</td>';
+      tb+='<td class="num">'+fmtNum(d.totalVolOiRatio,2)+'</td>';
       tb+='<td class="num">'+fmtNum(d.transferDays,0)+'</td>';
       tb+='<td class="num '+(d.transferScore>=0?'pos':'neg')+'">'+(d.transferScore>0?'+':'')+fmtNum(d.transferScore,0)+'</td>';
     }
+    tb+='<td class="num">'+(d.frontBackOiDivergence===1?'Spread':d.frontBackOiDivergence===-1?'Direct':'—')+'</td>';
     tb+='<td class="num">'+fmtNum(d.oiMomentum,2)+'</td>';
+    tb+='<td class="num">'+fmtNum(d.backOiMomentum,2)+'</td>';
     tb+='<td>'+(d.active_contract||'')+'</td>';
     tb+='</tr>';
   }
@@ -1230,10 +1345,14 @@ function renderDebug(){
   if(cotData.length)$('debugCotFields').textContent=JSON.stringify(cotData[0],null,2);
   if(oiData.length)$('debugOiSample').textContent=JSON.stringify(oiData[0],null,2);
   var wSample=mergedData.slice(-3).map(function(d){
-    return{date:d.date,frontOiDelta:d.frontOiDelta,combOiDelta:d.combOiDelta,priceDelta:d.priceDelta,
-      totalFrontVol:d.totalFrontVol,frontVolOiRatio:d.frontVolOiRatio,
+    return{date:d.date,
+      frontOiDelta:d.frontOiDelta,backOiDelta:d.backOiDelta,totalOiDelta:d.totalOiDelta,
+      priceDelta:d.priceDelta,
+      frontVolOiRatio:d.frontVolOiRatio,totalVolOiRatio:d.totalVolOiRatio,
       transferDays:d.transferDays,transferScore:d.transferScore,
-      oiMomentum:d.oiMomentum,priceOIDivergence:d.priceOIDivergence,
+      frontBackOiDivergence:d.frontBackOiDivergence,
+      oiMomentum:d.oiMomentum,backOiMomentum:d.backOiMomentum,
+      priceOIDivergence:d.priceOIDivergence,
       mm_net_delta:d.mm_net_delta,mm_long_delta:d.mm_long_delta,mm_short_delta:d.mm_short_delta};
   });
   $('debugWeekly').textContent=JSON.stringify(wSample,null,2);
@@ -1299,13 +1418,21 @@ function loadAllData(){
 
 function downloadMergedCsv(){
   if(!mergedData.length)return;
-  var hdrs=['Date','MM_Net','MM_Long','MM_Short','MM_Net_Delta','MM_Long_Delta','MM_Short_Delta','Front_OI_Delta','Comb_OI_Delta','Price_Delta','Front_OI_Level','Comb_OI_Level','Total_Front_Vol','Front_VolOI_Ratio','Transfer_Days','Transfer_Score','HighVol_Dir_Score','OI_Momentum','Price_OI_Divergence','Active_Contract'];
+  var hdrs=['Date','MM_Net','MM_Long','MM_Short','MM_Net_Delta','MM_Long_Delta','MM_Short_Delta',
+    'Front_OI_Delta','Back_OI_Delta','Total_OI_Delta','Price_Delta',
+    'Front_OI_Level','Back_OI_Level','Total_OI_Level',
+    'Total_Front_Vol','Total_Back_Vol','Front_VolOI_Ratio','Total_VolOI_Ratio',
+    'Transfer_Days','Transfer_Score','HighVol_Dir_Score',
+    'Front_Back_OI_Divergence','OI_Momentum','Back_OI_Momentum','Price_OI_Divergence','Active_Contract'];
   var csv=hdrs.join(',')+'\n';
   mergedData.forEach(function(d){
     csv+=[d.date,d.mm_net,d.mm_long,d.mm_short,d.mm_net_delta,d.mm_long_delta,d.mm_short_delta,
-      d.frontOiDelta,d.combOiDelta,d.priceDelta,d.frontOiLevel,d.combOiLevel,
-      d.totalFrontVol,d.frontVolOiRatio,d.transferDays,d.transferScore,d.highVolDirectionScore,
-      d.oiMomentum,d.priceOIDivergence,d.active_contract].join(',')+'\n';
+      d.frontOiDelta,d.backOiDelta,d.totalOiDelta,d.priceDelta,
+      d.frontOiLevel,d.backOiLevel,d.totalOiLevel,
+      d.totalFrontVol,d.totalBackVol,d.frontVolOiRatio,d.totalVolOiRatio,
+      d.transferDays,d.transferScore,d.highVolDirectionScore,
+      d.frontBackOiDivergence,d.oiMomentum,d.backOiMomentum,d.priceOIDivergence,
+      d.active_contract].join(',')+'\n';
   });
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download='cotton_mm_merged_v2_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
