@@ -78,8 +78,9 @@
     <div><label>Cotton OI/Volume CSV URL</label><input type="text" id="oiUrl" value="data/cotton_raw.csv"></div>
     <div class="info-box" style="margin-top:8px;">
       <strong>Roll weeks excluded from training:</strong> Jan last-biz to Feb 15 | Mar last-biz to Apr 15 | May last-biz to Jun 15 | Jul last-biz to Aug 15 | Oct last-biz to Nov 15<br>
-      <strong>OI window:</strong> cotDate-7 through cotDate (same window as base 60% R2 model)<br>
-      <strong>OI features:</strong> front_oi_delta (front month) + comb_oi_delta (all contracts summed = total OI)
+      <strong>OI window:</strong> prior Tuesday through this Tuesday (cotDate-7 to cotDate). Delta = this-Tue OI minus prior-Tue OI = net change over exactly Wed-Thu-Fri-Mon-Tue, matching the COT reporting period.<br>
+      <strong>Active contract</strong> for front-month OI is always taken from the COT Tuesday date (not per-day) to avoid FND transition mismatches mid-week.<br>
+      <strong>OI features:</strong> front_oi_delta (front month, consistent contract) + comb_oi_delta (all contracts summed = total OI)
     </div>
     <div class="flex" style="margin-top:8px;">
       <div><label>COT Source</label>
@@ -433,20 +434,21 @@ function alignWeekly(){
     if(weekOi.length<2)continue;
     var first=weekOi[0],last=weekOi[weekOi.length-1];
     var active=getActiveContract(cot.date),priceCol=active+' Comdty PX_LAST';
-    /* front OI delta */
-    var frontStart=getFrontMonthOI(first,first[OI_DATE_COL]),frontEnd=getFrontMonthOI(last,last[OI_DATE_COL]);
+    /* front OI delta — use cot.date for active contract on BOTH rows to avoid
+       FND transition mismatches where prior-Tue and this-Tue have different front months */
+    var frontStart=getFrontMonthOI(first,cot.date),frontEnd=getFrontMonthOI(last,cot.date);
     var frontDelta=(frontStart!=null&&frontEnd!=null)?frontEnd-frontStart:null;
-    /* combined (total) OI delta */
+    /* combined (total) OI delta — sum all contracts, no date dependency */
     var combStart=getCombinedOI(first),combEnd=getCombinedOI(last);
     var combDelta=(combStart!=null&&combEnd!=null)?combEnd-combStart:null;
-    /* price delta */
+    /* price delta — same fix: use cot.date active contract for price column */
     var priceStart=first[priceCol]!=null?parseFloat(first[priceCol]):null;
     var priceEnd=last[priceCol]!=null?parseFloat(last[priceCol]):null;
     var priceDelta=(priceStart!=null&&priceEnd!=null)?priceEnd-priceStart:null;
     /* std devs */
     var frontVals=[],combVals=[];
     for(var ri=0;ri<weekOi.length;ri++){
-      var fv=getFrontMonthOI(weekOi[ri],weekOi[ri][OI_DATE_COL]),cv=getCombinedOI(weekOi[ri]);
+      var fv=getFrontMonthOI(weekOi[ri],cot.date),cv=getCombinedOI(weekOi[ri]);
       if(fv!=null)frontVals.push(fv);if(cv!=null)combVals.push(cv);
     }
     /* avg total OI for transfer threshold */
@@ -460,7 +462,7 @@ function alignWeekly(){
     for(var ri=1;ri<weekOi.length;ri++){
       var r=weekOi[ri],rp=weekOi[ri-1],rd=parseDate(r[OI_DATE_COL]);
       var tOI=getCombinedOI(r),ptOI=getCombinedOI(rp);
-      var fOI=getFrontMonthOI(r,r[OI_DATE_COL]),pfOI=getFrontMonthOI(rp,rp[OI_DATE_COL]);
+      var fOI=getFrontMonthOI(r,cot.date),pfOI=getFrontMonthOI(rp,cot.date);
       var tVol=getTotalVol(r);
       var pr=r[priceCol]!=null?parseFloat(r[priceCol]):null;
       var ppr=rp[priceCol]!=null?parseFloat(rp[priceCol]):null;
