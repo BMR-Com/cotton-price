@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cotton MM Position Estimator v3</title>
+<title>Cotton MM Estimator v4 — Roll-Filtered + 2026 Holdout</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
@@ -14,7 +14,7 @@
   h2{font-size:1.05rem;color:var(--txt);margin:18px 0 8px;border-left:4px solid var(--acc);padding-left:8px;}
   h3{font-size:0.92rem;color:#555;margin:12px 0 6px;}
   .subtitle{font-size:0.82rem;color:#666;margin-bottom:16px;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:16px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:16px;}
   .card{background:var(--card);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:14px;border:1px solid var(--border);}
   .card-full{grid-column:1/-1;}
   label{display:block;font-size:0.78rem;color:#555;margin-bottom:3px;font-weight:600;}
@@ -24,132 +24,128 @@
   button:hover{opacity:.88;}
   .btn-sm{width:auto;padding:5px 12px;font-size:0.75rem;}
   .btn-sec{background:var(--acc2);}
-  .flex{display:flex;gap:10px;align-items:flex-end;}
-  .flex>div{flex:1;}
+  .flex{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+  .flex>div{flex:1;min-width:140px;}
   .status{font-size:0.78rem;padding:8px 12px;border-radius:5px;margin-top:10px;display:none;}
   .status.ok{background:#d4edda;color:#155724;border:1px solid #c3e6cb;}
   .status.err{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;}
   .status.warn{background:#fff3cd;color:#856404;border:1px solid #ffeaa7;}
   table{width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:8px;}
   th,td{padding:5px 7px;text-align:right;border-bottom:1px solid var(--border);}
-  th{background:#f8f9fa;font-weight:600;text-align:right;font-size:0.72rem;color:#555;position:sticky;top:0;}
+  th{background:#f8f9fa;font-weight:600;font-size:0.72rem;color:#555;position:sticky;top:0;}
   td:first-child,th:first-child{text-align:left;}
   tr:hover td{background:#f8f9fa;}
   .num{font-variant-numeric:tabular-nums;}
   .pos{color:var(--acc2);font-weight:600;}
   .neg{color:var(--err);font-weight:600;}
-  .chart-wrap{position:relative;height:260px;margin-top:10px;}
-  .chart-wrap-lg{height:340px;}
+  .chart-wrap{position:relative;height:280px;margin-top:10px;}
+  .chart-wrap-lg{height:360px;}
   .tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:12px;flex-wrap:wrap;}
   .tab{padding:7px 14px;font-size:0.8rem;cursor:pointer;border-radius:4px 4px 0 0;background:#f0f2f5;color:#555;font-weight:600;}
   .tab.active{background:var(--acc);color:#fff;}
   .tab-body{display:none;}
   .tab-body.active{display:block;}
   .small{font-size:0.72rem;color:#777;}
-  .scroll{max-height:320px;overflow:auto;}
+  .scroll{max-height:340px;overflow:auto;}
   .highlight{background:#fff9e6;border-left:3px solid var(--warn);padding:8px 12px;font-size:0.8rem;margin:8px 0;border-radius:0 4px 4px 0;}
+  .info-box{background:#e8f4fd;border:1px solid #bee5eb;border-radius:5px;padding:8px 12px;font-size:0.75rem;margin:6px 0;}
   .model-card{border:1px solid var(--border);border-radius:6px;padding:10px;margin:6px 0;background:#fafbfc;}
   .model-title{font-weight:700;color:var(--acc);font-size:0.85rem;}
   .model-stat{display:inline-block;margin:3px 8px 3px 0;font-size:0.75rem;}
   .best{background:#d4edda;border-color:#1a8c4e;}
-  .pred-box{background:var(--card);border:2px solid var(--acc);border-radius:8px;padding:14px;margin:10px 0;text-align:center;}
-  .pred-big{font-size:2rem;font-weight:700;color:var(--acc);}
-  .pred-label{font-size:0.8rem;color:#666;margin-top:4px;}
-  .fnd-info{background:#e8f4fd;border:1px solid #bee5eb;border-radius:5px;padding:8px 12px;font-size:0.75rem;margin:6px 0;}
+  .pred-box{background:var(--card);border:2px solid var(--acc);border-radius:8px;padding:14px;margin:6px 0;text-align:center;}
+  .pred-big{font-size:1.9rem;font-weight:700;color:var(--acc);}
+  .pred-label{font-size:0.78rem;color:#666;margin-top:4px;}
+  .holdout-row-actual{background:#e8f4fd;}
+  .holdout-row-roll{background:#fff8e1;color:#aaa;font-style:italic;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:700;margin-left:4px;}
+  .badge-roll{background:#fff3cd;color:#856404;border:1px solid #ffc107;}
+  .badge-test{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb;}
+  .badge-train{background:#d4edda;color:#155724;border:1px solid #c3e6cb;}
   .day-row{display:flex;gap:4px;margin:6px 0;flex-wrap:wrap;}
-  .day-cell{flex:1;min-width:80px;background:#f8f9fa;border:1px solid var(--border);border-radius:4px;padding:5px 6px;font-size:0.7rem;text-align:center;}
-  .day-cell .dn{font-weight:700;color:#555;margin-bottom:2px;}
-  .day-cell .dv{color:var(--vol);}
-  .day-cell .dp{color:#333;}
+  .day-cell{flex:1;min-width:75px;background:#f8f9fa;border:1px solid var(--border);border-radius:4px;padding:5px;font-size:0.68rem;text-align:center;}
   .day-cell.transfer{background:#f3e5ff;border-color:var(--vol);}
-  .day-cell.transfer .dn{color:var(--vol);}
-  @media(max-width:600px){.grid{grid-template-columns:1fr;}.flex{flex-direction:column;}.flex>div{width:100%;}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr;}.flex>div{width:100%;}}
 </style>
-<base target="_blank">
 </head>
 <body>
 
-<h1>🎯 Cotton MM Position Estimator v3</h1>
+<h1>🎯 Cotton MM Estimator v4 — Roll-Filtered + 2026 Out-of-Sample Test</h1>
 <p class="subtitle">
-  Enhanced: COT week Wed–Tue | Daily OI aggregation | Front OI + Back OI (orthogonal) |
-  Volume/OI transfer signal | Long + Short separately → Net | Auto-detects volume columns
+  Train on 2026 (excl. roll weeks) | Predict 2026 vs actual COT | Wed–Tue OI windows |
+  Front + Back OI orthogonal | Volume transfer signals | Best models only (R²≥10%)
 </p>
 
 <div class="grid">
   <div class="card">
     <h2>📁 Data Sources</h2>
-    <div class="flex">
-      <div>
-        <label>Cotton OI/Volume CSV URL</label>
-        <input type="text" id="oiUrl" value="data/cotton_raw.csv" placeholder="data/cotton_raw.csv">
-      </div>
+    <div>
+      <label>Cotton OI/Volume CSV URL</label>
+      <input type="text" id="oiUrl" value="data/cotton_raw.csv">
     </div>
-    <div class="fnd-info">
-      <strong>Volume columns:</strong> Auto-detected — any header containing "VOLUME" or "VOL" (e.g. <code>CTMAR1 Comdty VOLUME</code>).
-      If absent, model falls back gracefully to OI + price only.<br>
-      <strong>COT week:</strong> Wednesday open → Tuesday close (positions as of Tuesday).<br>
-      <strong>OI split:</strong> Front month OI and Back months OI are kept separate (orthogonal — no collinearity).
+    <div class="info-box" style="margin-top:8px;">
+      <strong>Roll weeks excluded from training:</strong>
+      Jan last-biz → Feb 15 | Mar last-biz → Apr 15 | May last-biz → Jun 15 |
+      Jul last-biz → Aug 15 | Oct last-biz → Nov 15<br>
+      <strong>Train:</strong> All non-roll weeks through Dec 31 2025 &nbsp;|&nbsp;
+      <strong>Test:</strong> 2026 weeks (non-roll, actual COT from API)
     </div>
     <div class="flex" style="margin-top:8px;">
       <div>
-        <label>COT Data Source</label>
+        <label>COT Source</label>
         <select id="cotSource">
-          <option value="api">Fetch from CFTC API (live)</option>
-          <option value="csv">Load local CSV</option>
+          <option value="api">CFTC API (live)</option>
+          <option value="csv">Local CSV</option>
         </select>
       </div>
       <div id="cotCsvDiv" style="display:none;">
         <label>COT CSV URL</label>
-        <input type="text" id="cotCsvUrl" value="data/cot_cotton.csv" placeholder="data/cot_cotton.csv">
+        <input type="text" id="cotCsvUrl" value="data/cot_cotton.csv">
       </div>
     </div>
     <div style="margin-top:10px;">
-      <button onclick="loadAllData()">🔄 Load Data & Run Regression</button>
-      <button class="btn-sm btn-sec" onclick="downloadMergedCsv()" id="dlBtn" style="display:none;margin-top:6px;">⬇ Download Merged CSV</button>
+      <button onclick="loadAllData()">🔄 Load & Run</button>
+      <button class="btn-sm btn-sec" onclick="downloadMergedCsv()" id="dlBtn" style="display:none;margin-top:6px;">⬇ Download CSV</button>
     </div>
     <div id="loadStatus" class="status"></div>
   </div>
 
   <div class="card">
-    <h2>⚙️ Model Settings</h2>
+    <h2>⚙️ Settings</h2>
     <div class="flex">
       <div>
-        <label>Lookback Window (weeks)</label>
-        <input type="number" id="lookback" value="52" min="12" max="260">
+        <label>Min R² to show model (%)</label>
+        <input type="number" id="minR2" value="10" min="0" max="80" step="5">
       </div>
       <div>
-        <label>Min R² to Show Prediction</label>
-        <input type="number" id="minR2" value="0.10" min="0" max="1" step="0.05">
+        <label>Vol/OI Transfer Threshold (×)</label>
+        <input type="number" id="volThresh" value="3.0" min="0.5" max="20" step="0.5">
       </div>
     </div>
     <div class="flex" style="margin-top:8px;">
       <div>
-        <label>Vol/OI Transfer Threshold (×)</label>
-        <input type="number" id="volThresh" value="3.0" min="0.5" max="20" step="0.5"
-          title="Day flagged as transfer if total Vol/OI ratio exceeds this AND total ΔOI < 2% of avg OI">
+        <label>Z-score Window (weeks)</label>
+        <input type="number" id="zWindow" value="52" min="8" max="260" step="4"
+          title="Rolling window for normalising OI/vol features into z-scores">
       </div>
       <div>
-        <label>Target Variable</label>
-        <select id="targetVar">
-          <option value="combined">Auto-best (direct Net vs L+S combined)</option>
-          <option value="net">Δ Net Position (direct)</option>
-          <option value="long">Δ Long Only</option>
-          <option value="short">Δ Short Only</option>
-        </select>
+        <label>Lag Weeks for OI features</label>
+        <input type="number" id="lagWeeks" value="1" min="0" max="4">
       </div>
     </div>
-    <div class="small" style="margin-top:8px;">
-      <strong>Transfer logic:</strong> High total volume + flat total OI on same day = spec↔commercial handoff.
-      No net futures OI change but COT will show large repositioning. Captured as weekly count + direction score.
+    <div class="small" style="margin-top:6px;">
+      Z-scoring removes scale differences between features and stabilises regression across market regimes.
+      Lagged OI captures momentum persistence from prior week's positioning flow.
     </div>
   </div>
 </div>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('tab-pred',this)">🔮 Current Estimate</div>
+  <div class="tab" onclick="switchTab('tab-holdout',this)">📊 2026 Holdout Test</div>
+  <div class="tab" onclick="switchTab('tab-models',this)">🧮 All Models</div>
+  <div class="tab" onclick="switchTab('tab-hist',this)">📈 Training Fit</div>
   <div class="tab" onclick="switchTab('tab-daily',this)">📅 Daily Breakdown</div>
-  <div class="tab" onclick="switchTab('tab-models',this)">📊 Model Comparison</div>
-  <div class="tab" onclick="switchTab('tab-hist',this)">📈 Historical Accuracy</div>
   <div class="tab" onclick="switchTab('tab-data',this)">📋 Data Table</div>
   <div class="tab" onclick="switchTab('tab-debug',this)">🔧 Debug</div>
 </div>
@@ -158,33 +154,27 @@
 <div id="tab-pred" class="tab-body active">
   <div class="grid">
     <div class="card card-full">
-      <h2>🔮 Latest Managed Money Position Estimate</h2>
+      <h2>🔮 Current Week Estimate (using best model from 2025-trained fit)</h2>
       <div id="predLoading" style="text-align:center;padding:30px;color:#999;">Load data to generate estimate</div>
       <div id="predContent" style="display:none;">
-        <div class="highlight">
-          <strong>Methodology:</strong> Daily OI + Volume aggregated over COT week (Wed–Tue).
-          Front OI and Back-months OI are orthogonal inputs (no double-counting).
-          Volume/OI ratio detects transfer days where specs cover shorts through PM counterparty — high volume but flat OI.
-          Long and Short modeled separately; if combined L+S R² beats direct net model, that estimate is used.
-        </div>
-        <div class="grid" style="margin-top:10px;">
+        <div class="grid" style="margin-top:6px;">
           <div class="card pred-box">
-            <div class="pred-label">Estimated Δ MM Net Position</div>
+            <div class="pred-label">Estimated Δ MM Net</div>
             <div class="pred-big" id="predDelta">—</div>
-            <div class="pred-label" id="predContext">contracts vs last COT</div>
+            <div class="pred-label" id="predContext">—</div>
           </div>
           <div class="card pred-box" style="border-color:var(--acc2);">
             <div class="pred-label">Estimated MM Net Level</div>
             <div class="pred-big" id="predLevel" style="color:var(--acc2);">—</div>
-            <div class="pred-label" id="predLevelContext">contracts</div>
+            <div class="pred-label" id="predLevelCtx">—</div>
           </div>
           <div class="card pred-box" style="border-color:var(--warn);">
-            <div class="pred-label">Best Model R²</div>
-            <div class="pred-big" id="predR2" style="color:var(--warn);font-size:1.6rem;">—</div>
+            <div class="pred-label">Best Model R² (train)</div>
+            <div class="pred-big" id="predR2" style="color:var(--warn);font-size:1.5rem;">—</div>
             <div class="pred-label" id="predModelName">—</div>
           </div>
         </div>
-        <div class="grid" style="margin-top:0;">
+        <div class="grid">
           <div class="card pred-box" style="border-color:var(--acc2);">
             <div class="pred-label">Est. Δ MM Long</div>
             <div class="pred-big" id="predLong" style="color:var(--acc2);font-size:1.5rem;">—</div>
@@ -195,21 +185,83 @@
           </div>
           <div class="card pred-box" style="border-color:var(--vol);">
             <div class="pred-label">Transfer Days / Score</div>
-            <div class="pred-big" id="predTransfer" style="color:var(--vol);font-size:1.5rem;">—</div>
-            <div class="pred-label" id="predTransferDesc">high vol / flat OI days this week</div>
+            <div class="pred-big" id="predTransfer" style="color:var(--vol);font-size:1.4rem;">—</div>
+            <div class="pred-label" id="predTransferDesc">—</div>
           </div>
         </div>
         <h3>Active Contract & FND</h3>
-        <div id="fndInfo" class="fnd-info"></div>
-        <h3>Weekly Feature Summary</h3>
+        <div id="fndInfo" class="info-box"></div>
+        <h3>This Week's Features</h3>
         <div id="oiBreakdown"></div>
-        <h3>Model Comparison</h3>
-        <div id="modelCompare"></div>
-        <h3>Features: This Week vs Last Week</h3>
-        <table>
-          <thead><tr><th>Feature</th><th>This Week</th><th>Last Week</th><th>Δ</th></tr></thead>
-          <tbody id="featTable"></tbody>
-        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOLDOUT TAB -->
+<div id="tab-holdout" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>📊 2026 Out-of-Sample: Predicted vs Actual COT</h2>
+      <div id="holdoutLoading" style="text-align:center;padding:30px;color:#999;">Load data to view holdout</div>
+      <div id="holdoutContent" style="display:none;">
+        <div class="highlight" id="holdoutSummary"></div>
+        <div class="chart-wrap chart-wrap-lg">
+          <canvas id="holdoutChart"></canvas>
+        </div>
+        <div class="chart-wrap" style="margin-top:12px;">
+          <canvas id="holdoutErrorChart"></canvas>
+        </div>
+        <h3>Week-by-week comparison</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr>
+              <th>COT Date</th><th>Actual Δ Net</th><th>Pred Δ Net</th><th>Error</th>
+              <th>Dir ✓</th><th>Actual Long Δ</th><th>Actual Short Δ</th>
+              <th>Front OI Δ</th><th>Back OI Δ</th><th>Note</th>
+            </tr></thead>
+            <tbody id="holdoutTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ALL MODELS TAB -->
+<div id="tab-models" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>🧮 All Models — Training Performance (R²≥10% shown)</h2>
+      <div id="modelsLoading" style="text-align:center;padding:30px;color:#999;">Load data</div>
+      <div id="modelsContent" style="display:none;">
+        <div class="chart-wrap chart-wrap-lg"><canvas id="modelChart"></canvas></div>
+        <div id="modelCards"></div>
+        <h3>Best Model Coefficients</h3>
+        <div class="chart-wrap"><canvas id="coefChart"></canvas></div>
+        <h3>Best Model Residuals vs Fitted</h3>
+        <div class="chart-wrap"><canvas id="residChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TRAINING FIT TAB -->
+<div id="tab-hist" class="tab-body">
+  <div class="grid">
+    <div class="card card-full">
+      <h2>📈 Training Fit (through 2025, roll weeks excluded)</h2>
+      <div id="histLoading" style="text-align:center;padding:30px;color:#999;">Load data</div>
+      <div id="histContent" style="display:none;">
+        <div class="chart-wrap chart-wrap-lg"><canvas id="histChart"></canvas></div>
+        <div class="chart-wrap" style="margin-top:12px;"><canvas id="accuracyChart"></canvas></div>
+        <h3>Model Summary</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>MAE</th><th>Dir Acc</th><th>n (train)</th></tr></thead>
+            <tbody id="accTable"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -219,57 +271,13 @@
 <div id="tab-daily" class="tab-body">
   <div class="grid">
     <div class="card card-full">
-      <h2>📅 Daily OI + Volume Breakdown (Current COT Week)</h2>
-      <div id="dailyLoading" style="text-align:center;padding:30px;color:#999;">Load data to view daily breakdown</div>
+      <h2>📅 Daily OI + Volume (Current COT Week)</h2>
+      <div id="dailyLoading" style="text-align:center;padding:30px;color:#999;">Load data</div>
       <div id="dailyContent" style="display:none;">
-        <div class="highlight">
-          <strong>🔀 Purple days</strong> = Transfer days (high total vol / flat total OI).
-          These are spec↔commercial handoffs — expect large COT repositioning with little futures OI change.
-        </div>
-        <h3>Current COT Week</h3>
-        <div id="dailyCurrent"></div>
-        <div class="chart-wrap chart-wrap-lg" style="margin-top:12px;">
-          <canvas id="dailyChart"></canvas>
-        </div>
-        <h3 style="margin-top:14px;">Prior COT Week</h3>
-        <div id="dailyPrior"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODELS TAB -->
-<div id="tab-models" class="tab-body">
-  <div class="grid">
-    <div class="card card-full">
-      <h2>📊 Regression Model Performance</h2>
-      <div id="modelsLoading" style="text-align:center;padding:30px;color:#999;">Load data to compare models</div>
-      <div id="modelsContent" style="display:none;">
-        <div class="chart-wrap chart-wrap-lg"><canvas id="modelChart"></canvas></div>
-        <div id="modelCards"></div>
-        <h3>Coefficients (Best Model)</h3>
-        <div class="chart-wrap"><canvas id="coefChart"></canvas></div>
-        <h3>Residuals vs Fitted (Best Model)</h3>
-        <div class="chart-wrap"><canvas id="residChart"></canvas></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- HISTORY TAB -->
-<div id="tab-hist" class="tab-body">
-  <div class="grid">
-    <div class="card card-full">
-      <h2>📈 Historical Prediction Accuracy</h2>
-      <div id="histLoading" style="text-align:center;padding:30px;color:#999;">Load data to view accuracy</div>
-      <div id="histContent" style="display:none;">
-        <div class="chart-wrap chart-wrap-lg"><canvas id="histChart"></canvas></div>
-        <div class="chart-wrap chart-wrap-lg" style="margin-top:15px;"><canvas id="accuracyChart"></canvas></div>
-        <h3>All Models</h3>
-        <table>
-          <thead><tr><th>Model</th><th>R²</th><th>RMSE</th><th>MAE</th><th>Dir Acc %</th><th>n</th></tr></thead>
-          <tbody id="accTable"></tbody>
-        </table>
+        <div class="highlight">🔀 Purple = transfer day (high total vol / flat total OI = spec↔commercial handoff)</div>
+        <h3>Current Week</h3><div id="dailyCurrent"></div>
+        <div class="chart-wrap chart-wrap-lg" style="margin-top:12px;"><canvas id="dailyChart"></canvas></div>
+        <h3 style="margin-top:14px;">Prior Week</h3><div id="dailyPrior"></div>
       </div>
     </div>
   </div>
@@ -279,8 +287,8 @@
 <div id="tab-data" class="tab-body">
   <div class="grid">
     <div class="card card-full">
-      <h2>📋 Merged Weekly Data</h2>
-      <div id="dataLoading" style="text-align:center;padding:30px;color:#999;">Load data to view table</div>
+      <h2>📋 All Weekly Data</h2>
+      <div id="dataLoading" style="text-align:center;padding:30px;color:#999;">Load data</div>
       <div id="dataContent" style="display:none;" class="scroll">
         <table><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
       </div>
@@ -293,44 +301,54 @@
   <div class="grid">
     <div class="card card-full">
       <h2>🔧 Debug</h2>
-      <div id="debugLoading" style="text-align:center;padding:30px;color:#999;">Load data to view debug info</div>
+      <div id="debugLoading" style="text-align:center;padding:30px;color:#999;">Load data</div>
       <div id="debugContent" style="display:none;">
         <div id="debugSummary"></div>
-        <h3>OI Sample Row</h3>
-        <pre id="debugOiSample" style="background:#f5f5f5;padding:10px;font-size:0.72rem;overflow:auto;max-height:200px;"></pre>
-        <h3>COT Sample Row</h3>
-        <pre id="debugCotFields" style="background:#f5f5f5;padding:10px;font-size:0.72rem;overflow:auto;max-height:200px;"></pre>
-        <h3>Weekly Sample (last 3)</h3>
-        <pre id="debugWeekly" style="background:#f5f5f5;padding:10px;font-size:0.72rem;overflow:auto;max-height:300px;"></pre>
-        <h3>Best Model Diagnostics</h3>
-        <pre id="debugReg" style="background:#f5f5f5;padding:10px;font-size:0.72rem;overflow:auto;max-height:300px;"></pre>
+        <h3>OI Sample</h3><pre id="debugOiSample" style="background:#f5f5f5;padding:8px;font-size:0.7rem;overflow:auto;max-height:180px;"></pre>
+        <h3>COT Sample</h3><pre id="debugCotFields" style="background:#f5f5f5;padding:8px;font-size:0.7rem;overflow:auto;max-height:180px;"></pre>
+        <h3>Feature Sample (last 3 weeks)</h3><pre id="debugWeekly" style="background:#f5f5f5;padding:8px;font-size:0.7rem;overflow:auto;max-height:280px;"></pre>
+        <h3>Best Model</h3><pre id="debugReg" style="background:#f5f5f5;padding:8px;font-size:0.7rem;overflow:auto;max-height:280px;"></pre>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ============================================================
+/* ================================================================
    CONSTANTS
-   ============================================================ */
-var COT_API = 'https://publicreporting.cftc.gov/resource/kh3c-gbw2.json';
+   ================================================================ */
+var COT_API  = 'https://publicreporting.cftc.gov/resource/kh3c-gbw2.json';
 var COT_COMM = "COTTON NO. 2 - ICE FUTURES U.S.";
-var CONTRACT_MONTHS = {CTMAR:2,CTMAY:4,CTJUL:6,CTOCT:9,CTDEC:11};
-var CONTRACT_ORDER  = ['CTMAR','CTMAY','CTJUL','CTOCT','CTDEC'];
+var CONTRACT_MONTHS   = {CTMAR:2,CTMAY:4,CTJUL:6,CTOCT:9,CTDEC:11};
+var CONTRACT_ORDER    = ['CTMAR','CTMAY','CTJUL','CTOCT','CTDEC'];
 var CONTRACT_PREFIXES = ['CTMAR1','CTMAR2','CTMAY1','CTMAY2','CTJUL1','CTJUL2','CTDEC1','CTDEC2'];
-var DATE_COL_CANDIDATES = ['Dates','Date','date','dates','Trade Date','TradeDate','report_date','As of Date','AsOfDate','DATES','DATE'];
+var DATE_COL_CANDIDATES = ['Dates','Date','date','dates','Trade Date','TradeDate',
+                           'report_date','As of Date','AsOfDate','DATES','DATE'];
 
-/* ============================================================
+/* Roll exclusion: month index (0-based) + day-of-month boundary.
+   Any COT-week whose Tuesday falls between [rollStartMonth, lastBizDay]
+   and [rollEndMonth, boundary day] is excluded from TRAINING.
+   Pairs: [expiryMonth0based, endMonth0based, endDay] */
+var ROLL_WINDOWS = [
+  {expiryMo:0, endMo:1, endDay:15},   /* Jan→Feb 15  (Mar contract)  */
+  {expiryMo:2, endMo:3, endDay:15},   /* Mar→Apr 15  (May contract)  */
+  {expiryMo:4, endMo:5, endDay:15},   /* May→Jun 15  (Jul contract)  */
+  {expiryMo:6, endMo:7, endDay:15},   /* Jul→Aug 15  (Oct contract)  */
+  {expiryMo:9, endMo:10,endDay:15}    /* Oct→Nov 15  (Dec contract)  */
+];
+
+/* ================================================================
    STATE
-   ============================================================ */
-var oiData=[], cotData=[], mergedData=[], bestModel=null, charts={};
+   ================================================================ */
+var oiData=[], cotData=[], mergedData=[], charts={};
+var trainData=[], testData=[];       /* split by year ≤2025 / ≥2026  */
+var bestModel=null, bestLongModel=null, bestShortModel=null;
 var OI_DATE_COL='Dates';
-var hasVolume=false;
-var volColsFound=[];
+var hasVolume=false, volCols=[];
 
-/* ============================================================
+/* ================================================================
    UTILITIES
-   ============================================================ */
+   ================================================================ */
 function $(id){return document.getElementById(id);}
 function showStatus(id,msg,type){var el=$(id);el.textContent=msg;el.className='status '+type;el.style.display='block';}
 
@@ -339,103 +357,39 @@ function parseDate(d){
   if(d instanceof Date)return isNaN(d.getTime())?null:d;
   var s=String(d).trim();
   if(!s||s==='null'||s==='undefined'||s==='NaN')return null;
-  var mdy=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if(mdy){var y=parseInt(mdy[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(mdy[1])-1,parseInt(mdy[2]));}
-  var md2=s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
-  if(md2){var y=parseInt(md2[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(md2[1])-1,parseInt(md2[2]));}
-  var ymd=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(ymd){return new Date(parseInt(ymd[1]),parseInt(ymd[2])-1,parseInt(ymd[3]));}
+  var a=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(a){var y=parseInt(a[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(a[1])-1,parseInt(a[2]));}
+  var b=s.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if(b){var y=parseInt(b[3]);if(y<50)y+=2000;else if(y<100)y+=1900;return new Date(y,parseInt(b[1])-1,parseInt(b[2]));}
+  var c=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(c)return new Date(parseInt(c[1]),parseInt(c[2])-1,parseInt(c[3]));
   var iso=new Date(s);if(!isNaN(iso.getTime()))return iso;
   return null;
 }
-
-function fmtDate(d){if(!d)return'';var dt=parseDate(d);if(!dt)return'';return dt.toISOString().split('T')[0];}
-function fmtNum(n,dec){if(n==null||isNaN(n))return'—';return n.toFixed(dec!==undefined?dec:0);}
+function fmtDate(d){if(!d)return'';var dt=parseDate(d);if(!dt)return'';return dt.toISOString().slice(0,10);}
+function fmtNum(n,dec){if(n==null||isNaN(n))return'—';return n.toFixed(dec!=null?dec:0);}
 function fmtPct(n){if(n==null||isNaN(n))return'—';return(n*100).toFixed(1)+'%';}
-function fmtK(n){if(n==null||isNaN(n))return'—';if(Math.abs(n)>=1000)return(n/1000).toFixed(1)+'k';return n.toFixed(0);}
-function arrMean(arr){var s=0,c=0;for(var i=0;i<arr.length;i++)if(arr[i]!=null&&!isNaN(arr[i])){s+=arr[i];c++;}return c>0?s/c:null;}
-function arrSum(arr){var s=0,c=0;for(var i=0;i<arr.length;i++)if(arr[i]!=null&&!isNaN(arr[i])){s+=arr[i];c++;}return c>0?s:null;}
-function arrFirst(arr){for(var i=0;i<arr.length;i++)if(arr[i]!=null&&!isNaN(arr[i]))return arr[i];return null;}
-function arrLast(arr){for(var i=arr.length-1;i>=0;i--)if(arr[i]!=null&&!isNaN(arr[i]))return arr[i];return null;}
-function weekDelta(arr){var f=arrFirst(arr),l=arrLast(arr);return(f!=null&&l!=null)?l-f:null;}
-function stdDev(arr){
-  var v=[];for(var i=0;i<arr.length;i++)if(arr[i]!=null&&!isNaN(arr[i]))v.push(arr[i]);
+function fmtK(n){if(n==null||isNaN(n))return'—';return Math.abs(n)>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);}
+
+function arrFirst(a){for(var i=0;i<a.length;i++)if(a[i]!=null&&!isNaN(a[i]))return a[i];return null;}
+function arrLast(a){for(var i=a.length-1;i>=0;i--)if(a[i]!=null&&!isNaN(a[i]))return a[i];return null;}
+function arrMean(a){var s=0,c=0;for(var i=0;i<a.length;i++)if(a[i]!=null&&!isNaN(a[i])){s+=a[i];c++;}return c>0?s/c:null;}
+function arrSum(a){var s=0,c=0;for(var i=0;i<a.length;i++)if(a[i]!=null&&!isNaN(a[i])){s+=a[i];c++;}return c>0?s:null;}
+function weekDelta(a){var f=arrFirst(a),l=arrLast(a);return(f!=null&&l!=null)?l-f:null;}
+function stdDev(a){
+  var v=[];for(var i=0;i<a.length;i++)if(a[i]!=null&&!isNaN(a[i]))v.push(a[i]);
   if(v.length<2)return 0;
   var m=0;for(var i=0;i<v.length;i++)m+=v[i];m/=v.length;
-  var sq=0;for(var i=0;i<v.length;i++)sq+=Math.pow(v[i]-m,2);
-  return Math.sqrt(sq/(v.length-1));
+  var s=0;for(var i=0;i<v.length;i++)s+=Math.pow(v[i]-m,2);
+  return Math.sqrt(s/(v.length-1));
 }
 
-/* ============================================================
-   CSV PARSER — auto-detects date col + volume cols
-   ============================================================ */
-function parseCSV(text){
-  var lines=text.trim().split(/\r?\n/);
-  if(!lines.length)return[];
-  var headers=lines[0].split(',').map(function(h){return h.trim().replace(/^"|"$/g,'');});
-
-  // Detect date column
-  var dateColIdx=-1;
-  for(var ci=0;ci<headers.length;ci++){
-    if(DATE_COL_CANDIDATES.indexOf(headers[ci])!==-1){dateColIdx=ci;OI_DATE_COL=headers[ci];break;}
-  }
-  if(dateColIdx===-1&&lines.length>1){
-    var fv=lines[1].split(',');
-    for(var ci=0;ci<fv.length;ci++){
-      if(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(fv[ci].trim())){
-        dateColIdx=ci;OI_DATE_COL=headers[ci];break;
-      }
-    }
-  }
-
-  // Detect volume columns
-  volColsFound=[];hasVolume=false;
-  for(var ci=0;ci<headers.length;ci++){
-    var hu=headers[ci].toUpperCase();
-    if(hu.indexOf('VOLUME')!==-1||hu.indexOf(' VOL')!==-1){
-      volColsFound.push(headers[ci]);hasVolume=true;
-    }
-  }
-
-  var out=[];
-  for(var i=1;i<lines.length;i++){
-    var line=lines[i];if(!line.trim())continue;
-    var vals=[],cur='',inQ=false;
-    for(var j=0;j<line.length;j++){
-      var c=line[j];
-      if(c==='"'){inQ=!inQ;continue;}
-      if(c===','&&!inQ){vals.push(cur.trim());cur='';continue;}
-      cur+=c;
-    }
-    vals.push(cur.trim());
-    var obj={};
-    for(var k=0;k<headers.length;k++){
-      var v=vals[k]||'';
-      if(v==='#N/A N/A'||v==='#N/A'||v==='')v=null;
-      else if(k===dateColIdx){v=v.replace(/^"|"$/g,'').trim();}
-      else if(!isNaN(parseFloat(v))&&v!==''){v=parseFloat(v);}
-      obj[headers[k]]=v;
-    }
-    out.push(obj);
-  }
-  return out;
-}
-
-function fetchText(url,timeout){
-  timeout=timeout||20000;
-  return new Promise(function(res,rej){
-    var ctrl=typeof AbortController!=='undefined'?new AbortController():null;
-    var tid=setTimeout(function(){if(ctrl)ctrl.abort();rej(new Error('Timeout'));},timeout);
-    fetch(url,ctrl?{signal:ctrl.signal}:{})
-      .then(function(r){clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
-      .then(function(t){res(t);})
-      .catch(function(e){clearTimeout(tid);rej(e);});
-  });
-}
-
-/* ============================================================
-   FND LOGIC (unchanged from base)
-   ============================================================ */
+/* ================================================================
+   ROLL EXCLUSION
+   A COT-week (identified by its Tuesday date) is in a roll window if:
+   - it falls after the last business day of expiryMo in the same year
+   - AND on or before endDay of endMo in the same year
+   ================================================================ */
 function isWeekend(d){return d.getDay()===0||d.getDay()===6;}
 function isHoliday(d){
   var y=d.getFullYear(),m=d.getMonth(),dt=d.getDate();
@@ -454,52 +408,128 @@ function isHoliday(d){
   if(m===11&&dt===26&&new Date(y,11,25).getDay()===0)return true;
   return false;
 }
-function subtractBusinessDays(start,n){
-  var d=new Date(start),cnt=0;
-  while(cnt<n){d.setDate(d.getDate()-1);if(!isWeekend(d)&&!isHoliday(d))cnt++;}
+function isBizDay(d){return !isWeekend(d)&&!isHoliday(d);}
+function lastBizDayOfMonth(yr,mo){
+  /* last calendar day of month, walk backwards to last biz day */
+  var last=new Date(yr,mo+1,0); /* day 0 of next month = last day of mo */
+  while(!isBizDay(last))last.setDate(last.getDate()-1);
+  return last;
+}
+function isRollWeek(cotTuesdayDate){
+  var d=parseDate(cotTuesdayDate);
+  if(!d)return false;
+  var yr=d.getFullYear();
+  for(var i=0;i<ROLL_WINDOWS.length;i++){
+    var rw=ROLL_WINDOWS[i];
+    var rollStart=lastBizDayOfMonth(yr,rw.expiryMo);
+    var rollEnd=new Date(yr,rw.endMo,rw.endDay);
+    /* inclusive: if cotDate > rollStart AND cotDate <= rollEnd → roll week */
+    if(d>rollStart&&d<=rollEnd)return true;
+  }
+  return false;
+}
+
+/* ================================================================
+   FND LOGIC
+   ================================================================ */
+function subtractBizDays(start,n){
+  var d=new Date(start.getTime()),cnt=0;
+  while(cnt<n){d.setDate(d.getDate()-1);if(isBizDay(d))cnt++;}
   return d;
 }
-function getFirstBizDay(yr,mo){
+function firstBizDay(yr,mo){
   var d=new Date(yr,mo,1);
-  while(isWeekend(d)||isHoliday(d))d.setDate(d.getDate()+1);
+  while(!isBizDay(d))d.setDate(d.getDate()+1);
   return d;
 }
-function computeFND(yr,mo){return subtractBusinessDays(getFirstBizDay(yr,mo),5);}
+function computeFND(yr,mo){return subtractBizDays(firstBizDay(yr,mo),5);}
 function getActiveContract(date){
   var d=parseDate(date);if(!d)return'CTMAR1';
-  var y=d.getFullYear();var fnds=[];
+  var y=d.getFullYear(),fnds=[];
   for(var i=0;i<CONTRACT_ORDER.length;i++){
-    var code=CONTRACT_ORDER[i],month=CONTRACT_MONTHS[code];
-    var f1=computeFND(y,month);if(d<=f1)fnds.push({code:code,year:y,fnd:f1});
-    var f2=computeFND(y+1,month);if(d<=f2)fnds.push({code:code,year:y+1,fnd:f2});
+    var code=CONTRACT_ORDER[i],mo=CONTRACT_MONTHS[code];
+    var f1=computeFND(y,mo);  if(d<=f1)fnds.push({code:code,year:y,fnd:f1});
+    var f2=computeFND(y+1,mo);if(d<=f2)fnds.push({code:code,year:y+1,fnd:f2});
   }
   fnds.sort(function(a,b){return a.fnd-b.fnd;});
   for(var i=0;i<fnds.length;i++){
     if(d<=fnds[i].fnd){
-      var cur=new Date().getFullYear();
-      return fnds[i].code+(fnds[i].year<=cur+1?'1':'2');
+      return fnds[i].code+(fnds[i].year<=new Date().getFullYear()+1?'1':'2');
     }
   }
   return'CTMAR1';
 }
-function getActiveContractInfo(date){
+function getContractInfo(date){
   var d=parseDate(date);if(!d)return null;
-  var active=getActiveContract(date);
-  var mc=active.replace(/\d$/,'');
-  var mo=CONTRACT_MONTHS[mc];
-  var yr=d.getFullYear();
+  var active=getActiveContract(date),mc=active.replace(/\d$/,'');
+  var mo=CONTRACT_MONTHS[mc],yr=d.getFullYear();
   var fnd=computeFND(yr,mo);
   if(d>fnd){yr++;fnd=computeFND(yr,mo);}
   return{contract:active,monthName:mc.replace('CT',''),year:yr,fnd:fnd,
-         daysToFND:Math.round((fnd.getTime()-d.getTime())/(1000*60*60*24))};
+         daysToFND:Math.round((fnd.getTime()-d.getTime())/(864e5))};
 }
 
-/* ============================================================
-   OI EXTRACTION
-   Front month OI and Back months OI are SEPARATE (orthogonal).
-   Back = total all contracts MINUS front month.
-   No double-counting in regression.
-   ============================================================ */
+/* ================================================================
+   CSV PARSER
+   ================================================================ */
+function parseCSV(text){
+  var lines=text.trim().split(/\r?\n/);if(!lines.length)return[];
+  var headers=lines[0].split(',').map(function(h){return h.trim().replace(/^"|"$/g,'');});
+  var dateColIdx=-1;
+  for(var ci=0;ci<headers.length;ci++){
+    if(DATE_COL_CANDIDATES.indexOf(headers[ci])!==-1){dateColIdx=ci;OI_DATE_COL=headers[ci];break;}
+  }
+  if(dateColIdx===-1&&lines.length>1){
+    var fv=lines[1].split(',');
+    for(var ci=0;ci<fv.length;ci++){
+      if(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(fv[ci].trim())){dateColIdx=ci;OI_DATE_COL=headers[ci];break;}
+    }
+  }
+  volCols=[];hasVolume=false;
+  for(var ci=0;ci<headers.length;ci++){
+    var hu=headers[ci].toUpperCase();
+    if(hu.indexOf('VOLUME')!==-1||(hu.indexOf(' VOL')!==-1&&hu.indexOf('VOLAT')===-1)){
+      volCols.push(headers[ci]);hasVolume=true;
+    }
+  }
+  var out=[];
+  for(var i=1;i<lines.length;i++){
+    var line=lines[i];if(!line.trim())continue;
+    var vals=[],cur='',inQ=false;
+    for(var j=0;j<line.length;j++){
+      var c=line[j];
+      if(c==='"'){inQ=!inQ;continue;}
+      if(c===','&&!inQ){vals.push(cur.trim());cur='';continue;}
+      cur+=c;
+    }
+    vals.push(cur.trim());
+    var obj={};
+    for(var k=0;k<headers.length;k++){
+      var v=vals[k]||'';
+      if(v==='#N/A N/A'||v==='#N/A'||v==='')v=null;
+      else if(k===dateColIdx)v=v.replace(/^"|"$/g,'').trim();
+      else if(!isNaN(parseFloat(v))&&v!=='')v=parseFloat(v);
+      obj[headers[k]]=v;
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+function fetchText(url,timeout){
+  timeout=timeout||25000;
+  return new Promise(function(res,rej){
+    var ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+    var tid=setTimeout(function(){if(ctrl)ctrl.abort();rej(new Error('Timeout: '+url));},timeout);
+    fetch(url,ctrl?{signal:ctrl.signal}:{})
+      .then(function(r){clearTimeout(tid);if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+      .then(function(t){res(t);}).catch(function(e){clearTimeout(tid);rej(e);});
+  });
+}
+
+/* ================================================================
+   OI EXTRACTION — orthogonal front / back split
+   ================================================================ */
 function getFrontOI(row,date){
   var active=getActiveContract(date);
   var v=row[active+' Comdty OPEN_INT'];
@@ -514,29 +544,15 @@ function getTotalOI(row){
   return c>0?s:null;
 }
 function getBackOI(row,date){
-  var tot=getTotalOI(row);
-  var front=getFrontOI(row,date);
-  if(tot==null)return null;
-  return tot-(front||0);
+  var tot=getTotalOI(row),front=getFrontOI(row,date);
+  return tot!=null?tot-(front||0):null;
 }
-
-/* ============================================================
-   VOLUME EXTRACTION — tries multiple suffix patterns
-   ============================================================ */
 function getFrontVol(row,date){
   if(!hasVolume)return null;
   var active=getActiveContract(date);
   var sfx=['Comdty VOLUME','Comdty PX_VOLUME','Comdty VOL'];
-  for(var s=0;s<sfx.length;s++){
-    var v=row[active+' '+sfx[s]];
-    if(v!=null&&!isNaN(v))return v;
-  }
-  for(var i=0;i<volColsFound.length;i++){
-    if(volColsFound[i].indexOf(active)!==-1){
-      var v=row[volColsFound[i]];
-      if(v!=null&&!isNaN(v))return v;
-    }
-  }
+  for(var s=0;s<sfx.length;s++){var v=row[active+' '+sfx[s]];if(v!=null&&!isNaN(v))return v;}
+  for(var i=0;i<volCols.length;i++){if(volCols[i].indexOf(active)!==-1){var v=row[volCols[i]];if(v!=null&&!isNaN(v))return v;}}
   return null;
 }
 function getTotalVol(row){
@@ -544,32 +560,24 @@ function getTotalVol(row){
   var s=0,c=0;
   var sfx=['Comdty VOLUME','Comdty PX_VOLUME','Comdty VOL'];
   for(var i=0;i<CONTRACT_PREFIXES.length;i++){
-    for(var j=0;j<sfx.length;j++){
-      var v=row[CONTRACT_PREFIXES[i]+' '+sfx[j]];
-      if(v!=null&&!isNaN(v)){s+=v;c++;break;}
-    }
+    for(var j=0;j<sfx.length;j++){var v=row[CONTRACT_PREFIXES[i]+' '+sfx[j]];if(v!=null&&!isNaN(v)){s+=v;c++;break;}}
   }
-  if(c===0){
-    for(var i=0;i<volColsFound.length;i++){
-      var v=row[volColsFound[i]];
-      if(v!=null&&!isNaN(v)){s+=v;c++;}
-    }
-  }
+  if(c===0)for(var i=0;i<volCols.length;i++){var v=row[volCols[i]];if(v!=null&&!isNaN(v)){s+=v;c++;}}
   return c>0?s:null;
 }
 
-/* ============================================================
-   COT FETCHING
-   ============================================================ */
+/* ================================================================
+   COT FETCH
+   ================================================================ */
 function fetchCOTFromAPI(){
   var url=COT_API+"?$where=market_and_exchange_names='"+COT_COMM.replace(/'/g,"''")+"'&$order=report_date_as_yyyy_mm_dd+ASC&$limit=10000";
-  return fetchText(url,30000).then(function(text){
+  return fetchText(url,40000).then(function(text){
     var data=JSON.parse(text);
     if(!Array.isArray(data))throw new Error('Invalid API response');
     return data.map(function(d){
       var ml=si(d.m_money_positions_long_all),ms=si(d.m_money_positions_short_all);
       return{date:d.report_date_as_yyyy_mm_dd,mm_long:ml,mm_short:ms,mm_net:ml-ms,
-             mm_spread:si(d.m_money_positions_spread),oi_all:si(d.open_interest_all)};
+             oi_all:si(d.open_interest_all)};
     });
   });
 }
@@ -581,28 +589,15 @@ function loadCOTFromCSV(url){
       var ms=si(d.mm_short||d.m_money_positions_short_all||d.Managed_Money_Short);
       return{date:d.Date||d.date||d.report_date_as_yyyy_mm_dd||d.Dates,
              mm_long:ml,mm_short:ms,mm_net:d.mm_net?si(d.mm_net):ml-ms,
-             mm_spread:si(d.mm_spread||d.m_money_positions_spread),
              oi_all:si(d.oi_all||d.open_interest_all||d.Open_Interest)};
     }).filter(function(d){return d.date&&!isNaN(d.mm_long);});
   });
 }
 function si(v){return(v==null||v===''||v==='#N/A N/A')?0:(parseInt(v)||0);}
 
-/* ============================================================
-   WEEKLY ALIGNMENT
-   COT week = Wednesday of prior week through Tuesday (COT report date).
-   Daily rows within that window are processed day-by-day.
-
-   NEW FEATURES vs base version:
-   - front_oi_delta    : front month OI end-start (same as before)
-   - back_oi_delta     : (total OI - front OI) end-start  ← ORTHOGONAL, no collinearity
-   - total_vol         : sum of all volume across the week (if available)
-   - vol_oi_ratio      : total_vol / avg_total_OI          (transfer intensity)
-   - transfer_days     : count of days where vol/OI > thresh AND total ΔOI ≈ 0
-   - transfer_score    : +1 per transfer day price up, -1 per transfer day price down
-   - oi_momentum       : fraction of days front OI rose vs fell (-1 to +1)
-   - daily_details     : array for daily breakdown tab
-   ============================================================ */
+/* ================================================================
+   WEEKLY ALIGNMENT  —  Wed–Tue window, daily aggregation
+   ================================================================ */
 function alignWeekly(){
   if(!oiData.length||!cotData.length)return[];
   var thresh=parseFloat($('volThresh').value)||3.0;
@@ -610,137 +605,111 @@ function alignWeekly(){
 
   for(var i=0;i<cotData.length;i++){
     var cot=cotData[i];
-    var cotDate=parseDate(cot.date);
-    if(!cotDate)continue;
+    var cotDate=parseDate(cot.date);if(!cotDate)continue;
     var prevCot=i>0?cotData[i-1]:null;
 
-    /* COT week: Wednesday (cotDate-6) through Tuesday (cotDate) */
+    /* COT week: Wednesday (cotDate-6 days) through Tuesday (cotDate) */
     var weekStart=new Date(cotDate.getTime());
-    weekStart.setDate(weekStart.getDate()-6);  // Wed before Tuesday
+    weekStart.setDate(weekStart.getDate()-6);
 
+    /* filter OI rows in [weekStart, cotDate] */
     var weekOi=oiData.filter(function(r){
       var d=parseDate(r[OI_DATE_COL]);
-      if(!d)return false;
-      return d>=weekStart&&d<=cotDate;
+      return d&&d>=weekStart&&d<=cotDate;
     });
-    if(weekOi.length<1)continue;
+    /* need at least 2 daily rows to compute a delta */
+    if(weekOi.length<2)continue;
 
     var active=getActiveContract(cot.date);
     var priceCol=active+' Comdty PX_LAST';
 
-    /* --- Per-day arrays --- */
-    var frontOIarr=[], backOIarr=[], totalOIarr=[];
-    var frontVolarr=[], totalVolarr=[];
-    var priceArr=[];
-
+    /* build per-day arrays */
+    var frontOIa=[],backOIa=[],totalOIa=[];
+    var frontVola=[],totalVola=[],priceA=[];
     for(var ri=0;ri<weekOi.length;ri++){
-      var r=weekOi[ri];
-      var rdate=r[OI_DATE_COL];
-      frontOIarr.push(getFrontOI(r,rdate));
-      var tot=getTotalOI(r);
-      totalOIarr.push(tot);
-      backOIarr.push(tot!=null?tot-(getFrontOI(r,rdate)||0):null);
-      frontVolarr.push(getFrontVol(r,rdate));
-      totalVolarr.push(getTotalVol(r));
-      var pv=r[priceCol];
-      priceArr.push(pv!=null?parseFloat(pv):null);
+      var r=weekOi[ri],rd=r[OI_DATE_COL];
+      var fOI=getFrontOI(r,rd);
+      var tOI=getTotalOI(r);
+      frontOIa.push(fOI);
+      totalOIa.push(tOI);
+      backOIa.push(tOI!=null?tOI-(fOI||0):null);
+      frontVola.push(getFrontVol(r,rd));
+      totalVola.push(getTotalVol(r));
+      var pv=r[priceCol];priceA.push(pv!=null?parseFloat(pv):null);
     }
 
-    /* --- Week-level aggregates --- */
-    var frontOiDelta = weekDelta(frontOIarr);
-    var backOiDelta  = weekDelta(backOIarr);
-    var totalOiDelta = weekDelta(totalOIarr);
-    var priceDelta   = weekDelta(priceArr);
-    var totalVol     = arrSum(totalVolarr);
-    var frontVol     = arrSum(frontVolarr);
-    var avgTotalOI   = arrMean(totalOIarr)||1;
-    var avgFrontOI   = arrMean(frontOIarr)||1;
+    /* week-level features */
+    var frontOiDelta = weekDelta(frontOIa);
+    var backOiDelta  = weekDelta(backOIa);
+    var totalOiDelta = weekDelta(totalOIa);
+    var priceDelta   = weekDelta(priceA);
+    var totalVol     = arrSum(totalVola);
+    var frontVol     = arrSum(frontVola);
+    var avgTotalOI   = arrMean(totalOIa)||1;
+    var avgFrontOI   = arrMean(frontOIa)||1;
     var volOiRatio   = totalVol!=null?totalVol/avgTotalOI:null;
-    var frontOiLevel = arrLast(frontOIarr);
-    var backOiLevel  = arrLast(backOIarr);
-    var totalOiLevel = arrLast(totalOIarr);
-    var priceLevel   = arrLast(priceArr);
+    var frontOiLevel = arrLast(frontOIa);
+    var totalOiLevel = arrLast(totalOIa);
+    var priceLevel   = arrLast(priceA);
 
-    /* --- Daily transfer detection ---
-       Transfer day = total vol/OI > thresh AND |Δ total OI| < 2% of avg total OI
-       Uses TOTAL OI (not just front) to catch back-month handoffs too */
-    var transferDays=0, transferScore=0;
-    var daysOIup=0, daysOIdown=0;
+    /* daily transfer detection (uses TOTAL OI to catch back-month handoffs) */
+    var transferDays=0,transferScore=0;
+    var daysOIup=0,daysOIdown=0;
     var dailyDetails=[];
-
+    var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     for(var ri=1;ri<weekOi.length;ri++){
-      var r=weekOi[ri];
-      var rdate=r[OI_DATE_COL];
-      var rd=parseDate(rdate);
-      var fOI=frontOIarr[ri],   pfOI=frontOIarr[ri-1];
-      var tOI=totalOIarr[ri],   ptOI=totalOIarr[ri-1];
-      var bOI=backOIarr[ri],    pbOI=backOIarr[ri-1];
-      var tVol=totalVolarr[ri];
-      var pr=priceArr[ri],      ppr=priceArr[ri-1];
-
-      var dFront=(fOI!=null&&pfOI!=null)?fOI-pfOI:null;
-      var dTotal=(tOI!=null&&ptOI!=null)?tOI-ptOI:null;
-      var dBack =(bOI!=null&&pbOI!=null)?bOI-pbOI:null;
-      var dPrice=(pr!=null&&ppr!=null)?pr-ppr:null;
-      var dayVolOI=(tVol!=null&&tOI!=null&&tOI>0)?tVol/tOI:null;
-
-      var isTransfer=false;
-      if(dayVolOI!=null&&dayVolOI>thresh&&dTotal!=null&&Math.abs(dTotal)<avgTotalOI*0.02){
-        isTransfer=true;
-        transferDays++;
-        if(dPrice!=null&&dPrice>0)transferScore++;
-        if(dPrice!=null&&dPrice<0)transferScore--;
-      }
-      if(dFront!=null){
-        if(dFront>0)daysOIup++;
-        else if(dFront<0)daysOIdown++;
-      }
-      var dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      dailyDetails.push({
-        date:rd,
-        dayName:rd?dayNames[rd.getDay()]:'?',
-        dFront:dFront,dBack:dBack,dTotal:dTotal,dPrice:dPrice,
-        tVol:tVol,dayVolOI:dayVolOI,isTransfer:isTransfer
-      });
+      var fOI=frontOIa[ri],pfOI=frontOIa[ri-1];
+      var tOI=totalOIa[ri],ptOI=totalOIa[ri-1];
+      var bOI=backOIa[ri], pbOI=backOIa[ri-1];
+      var tVol=totalVola[ri];
+      var pr=priceA[ri],ppr=priceA[ri-1];
+      var dF=(fOI!=null&&pfOI!=null)?fOI-pfOI:null;
+      var dT=(tOI!=null&&ptOI!=null)?tOI-ptOI:null;
+      var dB=(bOI!=null&&pbOI!=null)?bOI-pbOI:null;
+      var dP=(pr!=null&&ppr!=null)?pr-ppr:null;
+      var dvoi=(tVol!=null&&tOI!=null&&tOI>0)?tVol/tOI:null;
+      var isTr=(dvoi!=null&&dvoi>thresh&&dT!=null&&Math.abs(dT)<avgTotalOI*0.02);
+      if(isTr){transferDays++;if(dP!=null){if(dP>0)transferScore++;else if(dP<0)transferScore--;}}
+      if(dF!=null){if(dF>0)daysOIup++;else if(dF<0)daysOIdown++;}
+      var rd=parseDate(weekOi[ri][OI_DATE_COL]);
+      dailyDetails.push({date:rd,dayName:rd?DAYS[rd.getDay()]:'?',
+        dFront:dF,dBack:dB,dTotal:dT,dPrice:dP,tVol:tVol,dayVolOI:dvoi,isTransfer:isTr});
     }
-
     var oiMomentum=(daysOIup-daysOIdown)/Math.max(dailyDetails.length,1);
 
-    var mmNetLag1 =prevCot?prevCot.mm_net:null;
-    var mmLongLag1=prevCot?prevCot.mm_long:null;
-    var mmShortLag1=prevCot?prevCot.mm_short:null;
+    /* price direction for interaction term */
+    var priceDir=(priceDelta!=null)?(priceDelta>0?1:priceDelta<0?-1:0):0;
+    /* interaction: price direction × OI momentum captures confirmed vs diverging moves */
+    var priceOiInteraction=priceDir*oiMomentum;
+
+    /* week is roll? flag for downstream filtering */
+    var roll=isRollWeek(cot.date);
+    var yr=cotDate.getFullYear();
 
     out.push({
-      date:cot.date,
-      mm_net:cot.mm_net, mm_long:cot.mm_long, mm_short:cot.mm_short,
+      date:cot.date,year:yr,isRoll:roll,
+      mm_net:cot.mm_net,mm_long:cot.mm_long,mm_short:cot.mm_short,
       mm_net_delta:  prevCot?(cot.mm_net  -prevCot.mm_net  ):null,
       mm_long_delta: prevCot?(cot.mm_long -prevCot.mm_long ):null,
       mm_short_delta:prevCot?(cot.mm_short-prevCot.mm_short):null,
       oi_all:cot.oi_all, active_contract:active,
-      /* OI features */
       front_oi_delta:frontOiDelta,
       back_oi_delta:backOiDelta,
       total_oi_delta:totalOiDelta,
       front_oi_level:frontOiLevel,
-      back_oi_level:backOiLevel,
       total_oi_level:totalOiLevel,
-      /* Price */
       price_delta:priceDelta,
       price_level:priceLevel,
-      /* Volume */
       total_vol:totalVol,
       front_vol:frontVol,
       vol_oi_ratio:volOiRatio,
-      /* Transfer signals */
       transfer_days:transferDays,
       transfer_score:transferScore,
-      /* Momentum */
       oi_momentum:oiMomentum,
-      /* Lags */
-      mm_net_lag1:mmNetLag1,
-      mm_long_lag1:mmLongLag1,
-      mm_short_lag1:mmShortLag1,
-      /* Daily detail for breakdown tab */
+      price_oi_interaction:priceOiInteraction,
+      mm_net_lag1:  prevCot?prevCot.mm_net:null,
+      mm_long_lag1: prevCot?prevCot.mm_long:null,
+      mm_short_lag1:prevCot?prevCot.mm_short:null,
       daily_details:dailyDetails,
       days:weekOi.length
     });
@@ -748,27 +717,57 @@ function alignWeekly(){
   return out;
 }
 
-/* ============================================================
-   OLS REGRESSION (unchanged from base, just renamed vars)
-   ============================================================ */
+/* ================================================================
+   Z-SCORE NORMALISATION
+   Computes rolling z-scores for a numeric field using a trailing window
+   of training rows (non-roll, year<=2025). Returns new field name
+   {field}_z added to each row in-place.
+   ================================================================ */
+function addZscores(rows,field,window){
+  for(var i=0;i<rows.length;i++){
+    /* collect trailing window of non-null values from previous rows */
+    var vals=[];
+    for(var j=Math.max(0,i-window);j<i;j++){
+      var v=rows[j][field];
+      if(v!=null&&!isNaN(v))vals.push(v);
+    }
+    var v=rows[i][field];
+    if(v!=null&&!isNaN(v)&&vals.length>=4){
+      var m=0;for(var k=0;k<vals.length;k++)m+=vals[k];m/=vals.length;
+      var s=0;for(var k=0;k<vals.length;k++)s+=Math.pow(vals[k]-m,2);s=Math.sqrt(s/vals.length);
+      rows[i][field+'_z']=s>0?(v-m)/s:0;
+    } else {
+      rows[i][field+'_z']=0;
+    }
+  }
+}
+
+/* ================================================================
+   OLS REGRESSION (pure ES5)
+   ================================================================ */
 function olsRegression(y,X,names){
   var n=y.length,k=X[0].length;
-  if(n<k+2)return null;
+  if(n<k+3||k===0)return null;
+  /* build augmented X with intercept column */
   var Xb=[];
   for(var r=0;r<n;r++){var row=[1];for(var c=0;c<k;c++)row.push(X[r][c]);Xb.push(row);}
   var xtx=[];
-  for(var a=0;a<=k;a++){xtx.push([]);for(var b=0;b<=k;b++){var s=0;for(var r=0;r<n;r++)s+=Xb[r][a]*Xb[r][b];xtx[a].push(s);}}
+  for(var a=0;a<=k;a++){
+    xtx.push([]);
+    for(var b=0;b<=k;b++){var s=0;for(var r=0;r<n;r++)s+=Xb[r][a]*Xb[r][b];xtx[a].push(s);}
+  }
   var xty=[];
   for(var a=0;a<=k;a++){var s=0;for(var r=0;r<n;r++)s+=Xb[r][a]*y[r];xty.push([s]);}
   var beta=solveLinear(xtx,xty);
+  if(!beta)return null;
   var pred=[];
   for(var r=0;r<n;r++){var s=0;for(var c=0;c<=k;c++)s+=Xb[r][c]*beta[c];pred.push(s);}
   var yMean=0;for(var r=0;r<n;r++)yMean+=y[r];yMean/=n;
-  var ssTot=0;for(var r=0;r<n;r++)ssTot+=Math.pow(y[r]-yMean,2);
-  var ssRes=0;for(var r=0;r<n;r++)ssRes+=Math.pow(y[r]-pred[r],2);
+  var ssTot=0,ssRes=0,mae=0;
+  for(var r=0;r<n;r++){ssTot+=Math.pow(y[r]-yMean,2);ssRes+=Math.pow(y[r]-pred[r],2);mae+=Math.abs(y[r]-pred[r]);}
+  mae/=n;
   var r2=ssTot>0?1-ssRes/ssTot:0;
   var rmse=Math.sqrt(ssRes/n);
-  var mae=0;for(var r=0;r<n;r++)mae+=Math.abs(y[r]-pred[r]);mae/=n;
   var dc=0,dt=0;
   for(var r=1;r<n;r++){
     var ad=y[r]-y[r-1],pd=pred[r]-pred[r-1];
@@ -791,8 +790,7 @@ function solveLinear(A,b){
       for(var c=i;c<=n;c++)aug[r][c]-=f*aug[i][c];
     }
   }
-  var x=[];
-  for(var i=0;i<n;i++)x.push(0);
+  var x=[];for(var i=0;i<n;i++)x.push(0);
   for(var i=n-1;i>=0;i--){
     if(Math.abs(aug[i][i])<1e-12){x[i]=0;continue;}
     x[i]=aug[i][n];
@@ -802,30 +800,62 @@ function solveLinear(A,b){
   return x;
 }
 
-/* ============================================================
+/* apply a trained model to a single row object */
+function applyModel(m,fields,row){
+  if(!m||!m.beta||!m.beta.length)return null;
+  var p=m.beta[0];
+  for(var fi=0;fi<fields.length;fi++){
+    var v=row[fields[fi]];
+    p+=m.beta[fi+1]*(v!=null&&!isNaN(v)?v:0);
+  }
+  return p;
+}
+
+/* ================================================================
    MODEL BUILDING
-   Builds models for: direct net, direct long, direct short,
-   then assembles L+S combined net.
-   Best net model (direct or combined) wins.
-   ============================================================ */
+   Train ONLY on non-roll weeks with year <= 2025.
+   Z-score features are computed across ALL merged rows (in order)
+   so each row's z-score uses history up to that point.
+   ================================================================ */
 function buildModels(){
-  /* filter to rows with valid deltas */
-  var data=mergedData.filter(function(d){return d.mm_net_delta!=null&&d.mm_long_delta!=null&&d.mm_short_delta!=null;});
-  var lookback=parseInt($('lookback').value)||52;
-  if(data.length>lookback)data=data.slice(-lookback);
-  if(data.length<10)return null;
+  /* add z-scores across full merged dataset (in chronological order) */
+  var zWin=parseInt($('zWindow').value)||52;
+  var lagWk=parseInt($('lagWeeks').value)||1;
+  var zFields=['front_oi_delta','back_oi_delta','price_delta','vol_oi_ratio','transfer_score'];
+  for(var fi=0;fi<zFields.length;fi++)addZscores(mergedData,zFields[fi],zWin);
 
-  var yNet  =data.map(function(d){return d.mm_net_delta;});
-  var yLong =data.map(function(d){return d.mm_long_delta;});
-  var yShort=data.map(function(d){return d.mm_short_delta;});
+  /* add lagged z-score fields */
+  for(var i=0;i<mergedData.length;i++){
+    var lag=i>=lagWk?mergedData[i-lagWk]:null;
+    mergedData[i].front_oi_delta_lag_z = lag?lag.front_oi_delta_z:0;
+    mergedData[i].back_oi_delta_lag_z  = lag?lag.back_oi_delta_z:0;
+    mergedData[i].price_delta_lag_z    = lag?lag.price_delta_z:0;
+    /* lag of raw net (mean-reversion signal) */
+    mergedData[i].mm_net_lag1_norm     = lag&&lag.mm_net!=null?lag.mm_net/50000:0;
+  }
 
-  /* helper: build X matrix from named fields */
-  function mkX(fields){
-    return data.map(function(d){
+  /* split train vs test */
+  trainData=mergedData.filter(function(d){
+    return d.year<=2025&&!d.isRoll&&d.mm_net_delta!=null&&d.mm_long_delta!=null&&d.mm_short_delta!=null;
+  });
+  testData=mergedData.filter(function(d){
+    return d.year>=2026&&!d.isRoll&&d.mm_net_delta!=null;
+  });
+
+  if(trainData.length<10)return null;
+
+  var minR2=parseFloat($('minR2').value)/100||0.10;
+
+  /* targets */
+  var yNet  =trainData.map(function(d){return d.mm_net_delta;});
+  var yLong =trainData.map(function(d){return d.mm_long_delta;});
+  var yShort=trainData.map(function(d){return d.mm_short_delta;});
+
+  function mkX(fields,rows){
+    return (rows||trainData).map(function(d){
       var row=[];
       for(var fi=0;fi<fields.length;fi++){
-        var v=d[fields[fi]];
-        row.push(v!=null&&!isNaN(v)?v:0);
+        var v=d[fields[fi]];row.push(v!=null&&!isNaN(v)?v:0);
       }
       return row;
     });
@@ -833,300 +863,296 @@ function buildModels(){
 
   var mods=[];
 
-  /* --- BASE OI models (same as original) --- */
-  mods.push({name:'Front OI Δ only',
-    model:olsRegression(yNet,mkX(['front_oi_delta']),['Front OI Δ'])});
-  mods.push({name:'Back OI Δ only',
-    model:olsRegression(yNet,mkX(['back_oi_delta']),['Back OI Δ'])});
-  mods.push({name:'Front + Back OI Δ',
-    model:olsRegression(yNet,mkX(['front_oi_delta','back_oi_delta']),['Front OI Δ','Back OI Δ'])});
-  mods.push({name:'Front + Back OI + Price',
-    model:olsRegression(yNet,mkX(['front_oi_delta','back_oi_delta','price_delta']),
-                        ['Front OI Δ','Back OI Δ','Price Δ'])});
+  /* ---- MODEL 1: Raw OI deltas only (baseline) ---- */
+  var f1=['front_oi_delta','back_oi_delta'];
+  mods.push({name:'M1: Raw OI Δ (baseline)',fields:f1,
+    model:olsRegression(yNet,mkX(f1),f1)});
 
-  /* --- Volume-enhanced models --- */
+  /* ---- MODEL 2: Raw OI + Price ---- */
+  var f2=['front_oi_delta','back_oi_delta','price_delta'];
+  mods.push({name:'M2: Raw OI + Price',fields:f2,
+    model:olsRegression(yNet,mkX(f2),f2)});
+
+  /* ---- MODEL 3: Z-scored OI + Price (normalised) ---- */
+  var f3=['front_oi_delta_z','back_oi_delta_z','price_delta_z'];
+  mods.push({name:'M3: Z-score OI + Price',fields:f3,
+    model:olsRegression(yNet,mkX(f3),f3)});
+
+  /* ---- MODEL 4: Z-scored + lagged OI (momentum) ---- */
+  var f4=['front_oi_delta_z','back_oi_delta_z','price_delta_z',
+          'front_oi_delta_lag_z','back_oi_delta_lag_z'];
+  mods.push({name:'M4: Z-score OI + Lag (momentum)',fields:f4,
+    model:olsRegression(yNet,mkX(f4),f4)});
+
+  /* ---- MODEL 5: Z-score + price×OI interaction ---- */
+  var f5=['front_oi_delta_z','back_oi_delta_z','price_delta_z','price_oi_interaction'];
+  mods.push({name:'M5: Z-score + Price×OI Interaction',fields:f5,
+    model:olsRegression(yNet,mkX(f5),f5)});
+
+  /* ---- MODEL 6: Z-score + all signals ---- */
+  var f6base=['front_oi_delta_z','back_oi_delta_z','price_delta_z',
+              'front_oi_delta_lag_z','price_oi_interaction','oi_momentum','mm_net_lag1_norm'];
+  var f6=hasVolume?f6base.concat(['vol_oi_ratio_z','transfer_score_z']):f6base;
+  mods.push({name:'M6: Full Z-score Model',fields:f6,
+    model:olsRegression(yNet,mkX(f6),f6)});
+
+  /* ---- MODEL 7: Volume transfer only (if available) ---- */
   if(hasVolume){
-    mods.push({name:'Front+Back OI + Price + Vol/OI',
-      model:olsRegression(yNet,
-        mkX(['front_oi_delta','back_oi_delta','price_delta','vol_oi_ratio']),
-        ['Front OI Δ','Back OI Δ','Price Δ','Vol/OI Ratio'])});
-    mods.push({name:'Front+Back OI + Price + Transfer',
-      model:olsRegression(yNet,
-        mkX(['front_oi_delta','back_oi_delta','price_delta','transfer_days','transfer_score']),
-        ['Front OI Δ','Back OI Δ','Price Δ','Transfer Days','Transfer Score'])});
+    var f7=['front_oi_delta_z','back_oi_delta_z','price_delta_z','vol_oi_ratio_z','transfer_score_z','transfer_days'];
+    mods.push({name:'M7: Z-score + Volume Transfer',fields:f7,
+      model:olsRegression(yNet,mkX(f7),f7)});
   }
 
-  /* --- Full Net model --- */
-  var fullNetFields=['front_oi_delta','back_oi_delta','price_delta','oi_momentum','mm_net_lag1'];
-  if(hasVolume)fullNetFields.push('vol_oi_ratio','transfer_days','transfer_score');
-  mods.push({name:'Full Net Model',
-    model:olsRegression(yNet,mkX(fullNetFields),fullNetFields)});
+  /* ---- LONG SIDE ---- */
+  var fLong=hasVolume
+    ?['front_oi_delta_z','back_oi_delta_z','price_delta_z','price_oi_interaction','oi_momentum','vol_oi_ratio_z','transfer_score_z','mm_net_lag1_norm']
+    :['front_oi_delta_z','back_oi_delta_z','price_delta_z','price_oi_interaction','oi_momentum','mm_net_lag1_norm'];
+  var longMod={name:'Long-Side',fields:fLong,model:olsRegression(yLong,mkX(fLong),fLong)};
 
-  /* --- Long model --- */
-  var longFields=['front_oi_delta','back_oi_delta','price_delta','oi_momentum','mm_long_lag1'];
-  if(hasVolume)longFields.push('vol_oi_ratio','transfer_score');
-  var longModel={name:'Long-Side Model',fields:longFields,
-    model:olsRegression(yLong,mkX(longFields),longFields)};
+  /* ---- SHORT SIDE ---- */
+  var fShort=hasVolume
+    ?['front_oi_delta_z','back_oi_delta_z','price_delta_z','price_oi_interaction','oi_momentum','vol_oi_ratio_z','transfer_score_z','mm_net_lag1_norm']
+    :['front_oi_delta_z','back_oi_delta_z','price_delta_z','price_oi_interaction','oi_momentum','mm_net_lag1_norm'];
+  var shortMod={name:'Short-Side',fields:fShort,model:olsRegression(yShort,mkX(fShort),fShort)};
 
-  /* --- Short model --- */
-  var shortFields=['front_oi_delta','back_oi_delta','price_delta','oi_momentum','mm_short_lag1'];
-  if(hasVolume)shortFields.push('vol_oi_ratio','transfer_score');
-  var shortModel={name:'Short-Side Model',fields:shortFields,
-    model:olsRegression(yShort,mkX(shortFields),shortFields)};
-
-  /* --- Combined L+S → Net --- */
-  var combinedModel=null;
-  if(longModel.model&&shortModel.model){
-    var predNet=[];
-    for(var ri=0;ri<longModel.model.pred.length;ri++){
-      /* net delta = Δlong - Δshort (short delta positive = more shorts = net worse) */
-      predNet.push(longModel.model.pred[ri]-shortModel.model.pred[ri]);
-    }
-    var yMean=0;for(var ri=0;ri<yNet.length;ri++)yMean+=yNet[ri];yMean/=yNet.length;
-    var ssTot=0;for(var ri=0;ri<yNet.length;ri++)ssTot+=Math.pow(yNet[ri]-yMean,2);
-    var ssRes=0;for(var ri=0;ri<yNet.length;ri++)ssRes+=Math.pow(yNet[ri]-predNet[ri],2);
-    var r2=ssTot>0?1-ssRes/ssTot:0;
-    var rmse=Math.sqrt(ssRes/yNet.length);
-    var mae=0;for(var ri=0;ri<yNet.length;ri++)mae+=Math.abs(yNet[ri]-predNet[ri]);mae/=yNet.length;
+  /* ---- COMBINED L+S → Net ---- */
+  var combinedMod=null;
+  if(longMod.model&&shortMod.model){
+    var predLSNet=[];
+    for(var r=0;r<longMod.model.pred.length;r++)
+      predLSNet.push(longMod.model.pred[r]-shortMod.model.pred[r]);
+    var yMn=0;for(var r=0;r<yNet.length;r++)yMn+=yNet[r];yMn/=yNet.length;
+    var stot=0,sres=0,mae2=0;
+    for(var r=0;r<yNet.length;r++){stot+=Math.pow(yNet[r]-yMn,2);sres+=Math.pow(yNet[r]-predLSNet[r],2);mae2+=Math.abs(yNet[r]-predLSNet[r]);}
+    mae2/=yNet.length;
+    var r2c=stot>0?1-sres/stot:0;
     var dc=0,dt=0;
-    for(var ri=1;ri<yNet.length;ri++){
-      var ad=yNet[ri]-yNet[ri-1],pd=predNet[ri]-predNet[ri-1];
+    for(var r=1;r<yNet.length;r++){
+      var ad=yNet[r]-yNet[r-1],pd=predLSNet[r]-predLSNet[r-1];
       if(ad!==0){dt++;if((ad>0&&pd>0)||(ad<0&&pd<0))dc++;}
     }
-    var resid=[];for(var ri=0;ri<yNet.length;ri++)resid.push(yNet[ri]-predNet[ri]);
-    combinedModel={name:'Combined Long+Short→Net',
-      model:{beta:[],names:[],r2:r2,rmse:rmse,mae:mae,dirAcc:dt>0?dc/dt:0,
-             n:yNet.length,pred:predNet,resid:resid}};
-    mods.push(combinedModel);
+    var residLS=[];for(var r=0;r<yNet.length;r++)residLS.push(yNet[r]-predLSNet[r]);
+    combinedMod={name:'M8: Combined Long+Short→Net',fields:fLong,
+      model:{beta:[],names:[],r2:r2c,rmse:Math.sqrt(sres/yNet.length),mae:mae2,
+             dirAcc:dt>0?dc/dt:0,n:yNet.length,pred:predLSNet,resid:residLS}};
+    mods.push(combinedMod);
   }
 
-  mods=mods.filter(function(m){return m&&m.model;});
-  return{models:mods,longModel:longModel,shortModel:shortModel,
-         combinedModel:combinedModel,data:data,yNet:yNet,yLong:yLong,yShort:yShort};
+  /* filter by minR2 */
+  mods=mods.filter(function(m){return m&&m.model&&m.model.r2>=minR2;});
+
+  if(!mods.length)return null;
+
+  /* best net model */
+  var best=mods.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
+
+  bestModel=best;
+  bestLongModel=longMod.model?longMod:null;
+  bestShortModel=shortMod.model?shortMod:null;
+
+  return{models:mods,longModel:longMod,shortModel:shortMod,combinedModel:combinedMod,
+         trainData:trainData,yNet:yNet,yLong:yLong,yShort:yShort};
 }
 
-/* ============================================================
-   PREDICTION — apply best net model + L/S sub-models to latest row
-   ============================================================ */
-function predictLatest(mr){
-  if(!mr||!mr.models.length)return null;
-  var latest=mergedData[mergedData.length-1];
-  if(!latest)return null;
+/* ================================================================
+   PREDICTION for latest row
+   ================================================================ */
+function predictOne(row,mr){
+  if(!mr||!bestModel)return null;
+  var predNet=applyModel(bestModel.model,bestModel.fields,row);
+  var predLong=mr.longModel&&mr.longModel.model?applyModel(mr.longModel.model,mr.longModel.fields,row):null;
+  var predShort=mr.shortModel&&mr.shortModel.model?applyModel(mr.shortModel.model,mr.shortModel.fields,row):null;
+  return{predNet:predNet,predLong:predLong,predShort:predShort};
+}
 
-  /* find best net model by R² */
-  var bestNet=mr.models[0];
-  for(var i=1;i<mr.models.length;i++){
-    if(mr.models[i].model.r2>bestNet.model.r2)bestNet=mr.models[i];
-  }
-
-  function applyModel(m,fields){
-    if(!m||!m.model||!m.model.beta||!m.model.beta.length)return null;
-    var p=m.model.beta[0];
-    for(var fi=0;fi<fields.length;fi++){
-      var v=latest[fields[fi]];
-      p+=m.model.beta[fi+1]*(v!=null&&!isNaN(v)?v:0);
+/* ================================================================
+   HOLDOUT EVALUATION — apply best model to 2026 rows
+   ================================================================ */
+function evalHoldout(mr){
+  if(!testData.length||!bestModel)return[];
+  var out=[];
+  for(var i=0;i<testData.length;i++){
+    var row=testData[i];
+    var predNet=applyModel(bestModel.model,bestModel.fields,row);
+    var predLong=mr.longModel&&mr.longModel.model?applyModel(mr.longModel.model,mr.longModel.fields,row):null;
+    var predShort=mr.shortModel&&mr.shortModel.model?applyModel(mr.shortModel.model,mr.shortModel.fields,row):null;
+    var err=(predNet!=null&&row.mm_net_delta!=null)?predNet-row.mm_net_delta:null;
+    var dirOk=null;
+    if(predNet!=null&&row.mm_net_delta!=null&&row.mm_net_delta!==0){
+      dirOk=(predNet>0&&row.mm_net_delta>0)||(predNet<0&&row.mm_net_delta<0);
     }
-    return p;
+    out.push({
+      date:row.date,
+      actual:row.mm_net_delta,actualLong:row.mm_long_delta,actualShort:row.mm_short_delta,
+      predNet:predNet,predLong:predLong,predShort:predShort,
+      error:err,dirOk:dirOk,
+      front_oi_delta:row.front_oi_delta,back_oi_delta:row.back_oi_delta
+    });
   }
-
-  /* net prediction from best model */
-  var predNet=null;
-  if(bestNet.name==='Combined Long+Short→Net'){
-    /* re-derive from long and short sub-models */
-    var pl=applyModel(mr.longModel,mr.longModel.fields);
-    var ps=applyModel(mr.shortModel,mr.shortModel.fields);
-    predNet=(pl!=null&&ps!=null)?pl-ps:null;
-  } else {
-    /* figure out which fields that named model used */
-    var fields=bestNet.model.names.slice(1);
-    predNet=applyModel(bestNet,fields);
-  }
-
-  var predLong=applyModel(mr.longModel,mr.longModel.fields);
-  var predShort=applyModel(mr.shortModel,mr.shortModel.fields);
-
-  return{bestNet:bestNet,predNet:predNet,predLong:predLong,predShort:predShort,
-         latest:latest,allModels:mr.models,mr:mr};
+  return out;
 }
 
-/* ============================================================
-   UI — RENDER PREDICTION TAB
-   ============================================================ */
-function renderPrediction(pr){
-  if(!pr){
-    $('predContent').style.display='none';
-    $('predLoading').style.display='block';
-    return;
-  }
+/* ================================================================
+   UI — PREDICTION TAB
+   ================================================================ */
+function renderPrediction(mr){
   $('predLoading').style.display='none';
   $('predContent').style.display='block';
-  var p=pr.predNet, latest=pr.latest, best=pr.bestNet;
+  var latest=mergedData[mergedData.length-1];
+  if(!latest||!bestModel){$('predContent').innerHTML='<p style="color:#999;">No data.</p>';return;}
+
+  var pr=predictOne(latest,mr);
+  var p=pr?pr.predNet:null;
 
   var dEl=$('predDelta');
-  dEl.textContent=(p>0?'+':'')+fmtNum(p,0);
+  dEl.textContent=p!=null?(p>0?'+':'')+fmtNum(p,0):'—';
   dEl.className='pred-big '+(p>=0?'pos':'neg');
-  $('predContext').textContent='contracts vs last COT ('+fmtDate(latest.date)+')';
+  $('predContext').textContent='vs last COT ('+fmtDate(latest.date)+')'+(latest.isRoll?' ⚠ ROLL WEEK':'');
 
-  var lv=latest.mm_net+p;
-  $('predLevel').textContent=fmtNum(lv,0);
+  var lv=p!=null?latest.mm_net+p:null;
+  $('predLevel').textContent=lv!=null?fmtNum(lv,0):'—';
   $('predLevel').className='pred-big '+(lv>=0?'pos':'neg');
-  $('predLevelContext').textContent='est. MM Net (last known: '+fmtNum(latest.mm_net,0)+')';
+  $('predLevelCtx').textContent='last known: '+fmtNum(latest.mm_net,0);
 
-  $('predR2').textContent=fmtPct(best.model.r2);
-  $('predModelName').textContent=best.name+' (n='+best.model.n+')';
+  $('predR2').textContent=fmtPct(bestModel.model.r2);
+  $('predModelName').textContent=bestModel.name+' (n='+bestModel.model.n+' train weeks)';
 
-  /* long/short boxes */
-  if(pr.predLong!=null){
-    var lEl=$('predLong');
-    lEl.textContent=(pr.predLong>0?'+':'')+fmtNum(pr.predLong,0);
+  if(pr&&pr.predLong!=null){
+    var lEl=$('predLong');lEl.textContent=(pr.predLong>0?'+':'')+fmtNum(pr.predLong,0);
     lEl.className='pred-big '+(pr.predLong>=0?'pos':'neg');
   }
-  if(pr.predShort!=null){
-    var sEl=$('predShort');
-    sEl.textContent=(pr.predShort>0?'+':'')+fmtNum(pr.predShort,0);
+  if(pr&&pr.predShort!=null){
+    var sEl=$('predShort');sEl.textContent=(pr.predShort>0?'+':'')+fmtNum(pr.predShort,0);
     sEl.className='pred-big '+(pr.predShort>=0?'pos':'neg');
   }
-
-  /* transfer box */
   $('predTransfer').textContent=fmtNum(latest.transfer_days,0)+' / '+(latest.transfer_score>0?'+':'')+fmtNum(latest.transfer_score,0);
-  $('predTransferDesc').textContent=hasVolume?'transfer days / score (high vol, flat OI)':'(no volume data — add VOL columns to CSV)';
+  $('predTransferDesc').textContent=hasVolume?'transfer days / score':'(no volume — add VOL columns)';
 
-  /* FND */
-  var info=getActiveContractInfo(latest.date);
-  if(info){
-    $('fndInfo').innerHTML='<strong>Active:</strong> '+info.contract+
-      ' | <strong>Month:</strong> '+info.monthName+' '+info.year+
-      ' | <strong>FND:</strong> '+fmtDate(info.fnd)+
-      ' | <strong>Days to FND:</strong> '+info.daysToFND;
-  }
+  var info=getContractInfo(latest.date);
+  if(info)$('fndInfo').innerHTML='<strong>Active:</strong> '+info.contract+
+    ' | <strong>FND:</strong> '+fmtDate(info.fnd)+' | <strong>Days to FND:</strong> '+info.daysToFND;
 
-  /* feature summary table */
-  var oiHtml='<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>';
-  oiHtml+='<tr><td>Active Contract</td><td class="num">'+latest.active_contract+'</td></tr>';
-  oiHtml+='<tr><td>Front Month OI Δ (week)</td><td class="num '+(latest.front_oi_delta>=0?'pos':'neg')+'">'+(latest.front_oi_delta>0?'+':'')+fmtNum(latest.front_oi_delta,0)+'</td></tr>';
-  oiHtml+='<tr><td>Back Months OI Δ (week)</td><td class="num '+(latest.back_oi_delta>=0?'pos':'neg')+'">'+(latest.back_oi_delta>0?'+':'')+fmtNum(latest.back_oi_delta,0)+'</td></tr>';
-  oiHtml+='<tr><td>Total OI Δ (display only)</td><td class="num '+(latest.total_oi_delta>=0?'pos':'neg')+'">'+(latest.total_oi_delta>0?'+':'')+fmtNum(latest.total_oi_delta,0)+'</td></tr>';
-  oiHtml+='<tr><td>Price Δ (week)</td><td class="num '+(latest.price_delta>=0?'pos':'neg')+'">'+(latest.price_delta>0?'+':'')+fmtNum(latest.price_delta,2)+'¢</td></tr>';
-  oiHtml+='<tr><td>OI Momentum (-1→+1)</td><td class="num">'+fmtNum(latest.oi_momentum,2)+'</td></tr>';
-  if(hasVolume){
-    oiHtml+='<tr><td>Total Volume (week)</td><td class="num">'+fmtK(latest.total_vol)+'</td></tr>';
-    oiHtml+='<tr><td>Vol/OI Ratio</td><td class="num">'+fmtNum(latest.vol_oi_ratio,2)+'</td></tr>';
-    oiHtml+='<tr><td>Transfer Days</td><td class="num">'+fmtNum(latest.transfer_days,0)+'</td></tr>';
-    oiHtml+='<tr><td>Transfer Score</td><td class="num '+(latest.transfer_score>=0?'pos':'neg')+'">'+(latest.transfer_score>0?'+':'')+fmtNum(latest.transfer_score,0)+'</td></tr>';
-  }
-  oiHtml+='</tbody></table>';
-  $('oiBreakdown').innerHTML=oiHtml;
-
-  /* model compare cards */
-  var ch='';
-  pr.allModels.forEach(function(m){
-    var isBest=(m.name===best.name);
-    ch+='<div class="model-card '+(isBest?'best':'')+'">'+
-        '<div class="model-title">'+m.name+(isBest?' ⭐ BEST':'')+'</div>'+
-        '<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>'+
-        '<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>'+
-        '<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>'+
-        '<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>'+
-        '</div>';
-  });
-  $('modelCompare').innerHTML=ch;
-
-  /* features this vs last week */
-  var prev=mergedData.length>1?mergedData[mergedData.length-2]:null;
+  var oh='<table><thead><tr><th>Feature</th><th>Raw</th><th>Z-score</th></tr></thead><tbody>';
   var frows=[
-    {name:'Front OI Δ',key:'front_oi_delta'},
-    {name:'Back OI Δ',key:'back_oi_delta'},
-    {name:'Price Δ',key:'price_delta'},
-    {name:'OI Momentum',key:'oi_momentum'},
-    {name:'MM Net Lag1',key:'mm_net_lag1'}
+    {label:'Front OI Δ',raw:'front_oi_delta',z:'front_oi_delta_z'},
+    {label:'Back OI Δ',raw:'back_oi_delta',z:'back_oi_delta_z'},
+    {label:'Price Δ',raw:'price_delta',z:'price_delta_z'},
+    {label:'OI Momentum',raw:'oi_momentum',z:null},
+    {label:'Price×OI Interaction',raw:'price_oi_interaction',z:null}
   ];
   if(hasVolume){
-    frows.push({name:'Vol/OI Ratio',key:'vol_oi_ratio'});
-    frows.push({name:'Transfer Score',key:'transfer_score'});
+    frows.push({label:'Vol/OI Ratio',raw:'vol_oi_ratio',z:'vol_oi_ratio_z'});
+    frows.push({label:'Transfer Score',raw:'transfer_score',z:'transfer_score_z'});
   }
-  var ftHtml='';
   frows.forEach(function(f){
-    var tw=latest[f.key],lw=prev?prev[f.key]:null;
-    var delta=(tw!=null&&lw!=null)?tw-lw:null;
-    ftHtml+='<tr><td>'+f.name+'</td><td class="num">'+fmtNum(tw,2)+'</td><td class="num">'+fmtNum(lw,2)+'</td>'+
-            '<td class="num '+(delta>=0?'pos':'neg')+'">'+(delta>0?'+':'')+fmtNum(delta,2)+'</td></tr>';
+    var rv=latest[f.raw],zv=f.z?latest[f.z]:null;
+    oh+='<tr><td>'+f.label+'</td><td class="num">'+fmtNum(rv,2)+'</td><td class="num">'+
+        (zv!=null?fmtNum(zv,2):'—')+'</td></tr>';
   });
-  $('featTable').innerHTML=ftHtml;
+  $('oiBreakdown').innerHTML=oh+'</tbody></table>';
 }
 
-/* ============================================================
-   UI — RENDER DAILY BREAKDOWN TAB
-   ============================================================ */
-function renderDailyTab(pr){
-  if(!pr||!pr.latest||!pr.latest.daily_details){
-    $('dailyContent').style.display='none';
-    $('dailyLoading').style.display='block';
+/* ================================================================
+   UI — HOLDOUT TAB
+   ================================================================ */
+function renderHoldout(holdout){
+  $('holdoutLoading').style.display='none';
+  $('holdoutContent').style.display='block';
+  if(!holdout.length){
+    $('holdoutContent').innerHTML='<p style="padding:20px;color:#999;">No 2026 COT data available yet — check back once CFTC publishes 2026 reports.</p>';
     return;
   }
-  $('dailyLoading').style.display='none';
-  $('dailyContent').style.display='block';
 
-  function buildGrid(details,label){
-    if(!details||!details.length)return '<p style="color:#999;font-size:0.8rem;">No daily data.</p>';
-    var html='<div class="day-row">';
-    for(var i=0;i<details.length;i++){
-      var dd=details[i];
-      html+='<div class="day-cell'+(dd.isTransfer?' transfer':'')+'">'+
-            '<div class="dn">'+dd.dayName+' '+(dd.date?fmtDate(dd.date).slice(5):'')+(dd.isTransfer?' 🔀':'')+'</div>'+
-            '<div>ΔFront: '+(dd.dFront!=null?(dd.dFront>0?'+':'')+fmtK(dd.dFront):'—')+'</div>'+
-            '<div>ΔBack: '+(dd.dBack!=null?(dd.dBack>0?'+':'')+fmtK(dd.dBack):'—')+'</div>'+
-            (hasVolume?'<div class="dv">Vol: '+(dd.tVol!=null?fmtK(dd.tVol):'—')+'</div>':'')+
-            (hasVolume?'<div class="dv">V/OI: '+(dd.dayVolOI!=null?dd.dayVolOI.toFixed(1):'—')+'</div>':'')+
-            '<div class="dp">ΔP: '+(dd.dPrice!=null?(dd.dPrice>0?'+':'')+dd.dPrice.toFixed(2)+'¢':'—')+'</div>'+
-            '</div>';
+  /* summary stats */
+  var actuals=[],preds=[],errors=[],dirOks=0,dirTot=0;
+  for(var i=0;i<holdout.length;i++){
+    var h=holdout[i];
+    if(h.actual!=null&&h.predNet!=null){
+      actuals.push(h.actual);preds.push(h.predNet);
+      if(h.error!=null)errors.push(h.error);
+      if(h.dirOk!=null){dirTot++;if(h.dirOk)dirOks++;}
     }
-    html+='</div>';
-    return html;
   }
-
-  $('dailyCurrent').innerHTML=buildGrid(pr.latest.daily_details,'Current');
-  var prev=mergedData.length>1?mergedData[mergedData.length-2]:null;
-  $('dailyPrior').innerHTML=prev&&prev.daily_details?buildGrid(prev.daily_details,'Prior'):'<p style="color:#999;font-size:0.8rem;">No prior week data.</p>';
-
-  /* daily chart */
-  var details=pr.latest.daily_details;
-  var labels=details.map(function(dd){return dd.dayName+' '+(dd.date?fmtDate(dd.date).slice(5):'');});
-  var ds=[
-    {label:'Δ Front OI',data:details.map(function(dd){return dd.dFront||0;}),backgroundColor:'rgba(42,82,152,0.6)',type:'bar',yAxisID:'y'},
-    {label:'Δ Back OI', data:details.map(function(dd){return dd.dBack||0;}), backgroundColor:'rgba(26,140,78,0.5)',type:'bar',yAxisID:'y'},
-    {label:'Δ Price (¢)',data:details.map(function(dd){return dd.dPrice||0;}),borderColor:'#d4880f',type:'line',yAxisID:'y2',tension:0.2}
-  ];
-  if(hasVolume){
-    ds.push({label:'Total Vol/OI',data:details.map(function(dd){return dd.dayVolOI||0;}),
-             borderColor:'#7b2fbe',backgroundColor:'rgba(123,47,190,0.15)',type:'bar',yAxisID:'y3'});
+  var r2h=0,rmseh=0;
+  if(actuals.length>=2){
+    var ym=0;for(var i=0;i<actuals.length;i++)ym+=actuals[i];ym/=actuals.length;
+    var st=0,sr=0;
+    for(var i=0;i<actuals.length;i++){st+=Math.pow(actuals[i]-ym,2);sr+=Math.pow(actuals[i]-preds[i],2);}
+    r2h=st>0?1-sr/st:0;
+    rmseh=Math.sqrt(sr/actuals.length);
   }
-  var ctx=$('dailyChart').getContext('2d');
-  if(charts.daily)charts.daily.destroy();
-  var scales={
-    y:{type:'linear',position:'left',title:{display:true,text:'Δ OI'}},
-    y2:{type:'linear',position:'right',title:{display:true,text:'Δ Price ¢'},grid:{drawOnChartArea:false}}
-  };
-  if(hasVolume)scales.y3={type:'linear',position:'right',title:{display:true,text:'Vol/OI'},grid:{drawOnChartArea:false}};
-  charts.daily=new Chart(ctx,{data:{labels:labels,datasets:ds},
+  $('holdoutSummary').innerHTML=
+    '<strong>2026 Out-of-Sample Results</strong> ('+holdout.length+' weeks) &nbsp;|&nbsp; '+
+    'R²: <strong>'+fmtPct(r2h)+'</strong> &nbsp;|&nbsp; '+
+    'RMSE: <strong>'+fmtNum(rmseh,0)+'</strong> contracts &nbsp;|&nbsp; '+
+    'Dir Acc: <strong>'+(dirTot>0?Math.round(dirOks/dirTot*100)+'%':'—')+'</strong> ('+dirOks+'/'+dirTot+') &nbsp;|&nbsp; '+
+    'Model trained on: <strong>'+trainData.length+' non-roll weeks ≤2025</strong>';
+
+  /* chart */
+  var labels=holdout.map(function(h){return fmtDate(h.date);});
+  var ctx=$('holdoutChart').getContext('2d');
+  if(charts.holdout)charts.holdout.destroy();
+  charts.holdout=new Chart(ctx,{type:'line',
+    data:{labels:labels,datasets:[
+      {label:'Actual Δ MM Net',data:holdout.map(function(h){return h.actual;}),
+       borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.1)',fill:true,tension:0.1,pointRadius:4},
+      {label:'Predicted Δ MM Net',data:holdout.map(function(h){return h.predNet;}),
+       borderColor:'#d4880f',borderDash:[6,3],tension:0.1,pointRadius:4,pointStyle:'triangle'}
+    ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{title:{display:true,text:'Daily breakdown — current COT week'}},
-      scales:scales}});
+      plugins:{title:{display:true,text:'2026: Actual vs Predicted Δ MM Net (out-of-sample)'},
+               legend:{position:'top'}},
+      scales:{y:{title:{display:true,text:'Δ MM Net (contracts)'}}}}});
+
+  /* error chart */
+  var ctx2=$('holdoutErrorChart').getContext('2d');
+  if(charts.holdoutErr)charts.holdoutErr.destroy();
+  charts.holdoutErr=new Chart(ctx2,{type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'Prediction Error (pred−actual)',
+       data:holdout.map(function(h){return h.error;}),
+       backgroundColor:holdout.map(function(h){
+         return h.error==null?'#ccc':Math.abs(h.error)<2000?'rgba(26,140,78,0.6)':
+                Math.abs(h.error)<5000?'rgba(212,136,15,0.6)':'rgba(192,57,43,0.6)';
+       })}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{title:{display:true,text:'Prediction Errors (green<2k, orange<5k, red≥5k contracts)'}},
+      scales:{y:{title:{display:true,text:'Error (contracts)'}}}}});
+
+  /* table */
+  var tb='';
+  for(var i=0;i<holdout.length;i++){
+    var h=holdout[i];
+    var dirIcon=h.dirOk===true?'✅':h.dirOk===false?'❌':'—';
+    tb+='<tr>'+
+      '<td>'+fmtDate(h.date)+'</td>'+
+      '<td class="num '+(h.actual>=0?'pos':'neg')+'">'+(h.actual>0?'+':'')+fmtNum(h.actual,0)+'</td>'+
+      '<td class="num '+(h.predNet>=0?'pos':'neg')+'">'+(h.predNet>0?'+':'')+fmtNum(h.predNet,0)+'</td>'+
+      '<td class="num '+(h.error>=0?'pos':'neg')+'">'+(h.error>0?'+':'')+fmtNum(h.error,0)+'</td>'+
+      '<td style="text-align:center;">'+dirIcon+'</td>'+
+      '<td class="num '+(h.actualLong>=0?'pos':'neg')+'">'+(h.actualLong>0?'+':'')+fmtNum(h.actualLong,0)+'</td>'+
+      '<td class="num '+(h.actualShort>=0?'pos':'neg')+'">'+(h.actualShort>0?'+':'')+fmtNum(h.actualShort,0)+'</td>'+
+      '<td class="num '+(h.front_oi_delta>=0?'pos':'neg')+'">'+(h.front_oi_delta>0?'+':'')+fmtNum(h.front_oi_delta,0)+'</td>'+
+      '<td class="num '+(h.back_oi_delta>=0?'pos':'neg')+'">'+(h.back_oi_delta>0?'+':'')+fmtNum(h.back_oi_delta,0)+'</td>'+
+      '<td></td>'+
+      '</tr>';
+  }
+  $('holdoutTable').innerHTML=tb;
 }
 
-/* ============================================================
-   UI — RENDER MODELS TAB
-   ============================================================ */
+/* ================================================================
+   UI — MODELS TAB
+   ================================================================ */
 function renderModels(mr){
-  if(!mr){$('modelsContent').style.display='none';$('modelsLoading').style.display='block';return;}
   $('modelsLoading').style.display='none';$('modelsContent').style.display='block';
   var mods=mr.models;
-  var ctx=$('modelChart').getContext('2d');
-  if(charts.model)charts.model.destroy();
+  var ctx=$('modelChart').getContext('2d');if(charts.model)charts.model.destroy();
   charts.model=new Chart(ctx,{type:'bar',
     data:{labels:mods.map(function(m){return m.name;}),
           datasets:[
-            {label:'R²',data:mods.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},
-            {label:'Dir Acc',data:mods.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}
+            {label:'R² (train)',data:mods.map(function(m){return m.model.r2;}),backgroundColor:'rgba(42,82,152,0.7)',yAxisID:'y'},
+            {label:'Dir Acc',   data:mods.map(function(m){return m.model.dirAcc;}),backgroundColor:'rgba(26,140,78,0.7)',yAxisID:'y1'}
           ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top'}},
@@ -1134,167 +1160,216 @@ function renderModels(mr){
               y1:{position:'right',min:0,max:1,title:{display:true,text:'Dir Acc'},grid:{drawOnChartArea:false}}}}});
   var cards='';
   mods.forEach(function(m){
-    cards+='<div class="model-card"><div class="model-title">'+m.name+'</div>'+
-            '<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>'+
-            '<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>'+
-            '<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>'+
-            '<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>'+
-            '<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>';
+    var isBest=(m.name===bestModel.name);
+    cards+='<div class="model-card '+(isBest?'best':'')+'">'+
+      '<div class="model-title">'+m.name+(isBest?' ⭐ BEST':'')+'</div>'+
+      '<div class="model-stat"><strong>R²:</strong> '+fmtPct(m.model.r2)+'</div>'+
+      '<div class="model-stat"><strong>RMSE:</strong> '+fmtNum(m.model.rmse,0)+'</div>'+
+      '<div class="model-stat"><strong>MAE:</strong> '+fmtNum(m.model.mae,0)+'</div>'+
+      '<div class="model-stat"><strong>Dir Acc:</strong> '+fmtPct(m.model.dirAcc)+'</div>'+
+      '<div class="model-stat"><strong>n:</strong> '+m.model.n+'</div>';
     if(m.model.names&&m.model.names.length){
       cards+='<div style="margin-top:5px;font-size:0.7rem;color:#555;">';
-      for(var i=0;i<m.model.names.length;i++){
-        cards+=m.model.names[i]+'='+fmtNum(m.model.beta[i],4);
-        if(i<m.model.names.length-1)cards+=', ';
-      }
+      for(var i=0;i<m.model.names.length;i++)
+        cards+=m.model.names[i]+'='+fmtNum(m.model.beta[i],4)+(i<m.model.names.length-1?', ':'');
       cards+='</div>';
     }
     cards+='</div>';
   });
   $('modelCards').innerHTML=cards;
-  var best=mods.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
+  var best=bestModel;
   if(best.model.beta&&best.model.beta.length>1){
-    var ctx2=$('coefChart').getContext('2d');
-    if(charts.coef)charts.coef.destroy();
+    var ctx2=$('coefChart').getContext('2d');if(charts.coef)charts.coef.destroy();
     charts.coef=new Chart(ctx2,{type:'bar',
-      data:{labels:best.model.names.slice(1),datasets:[{label:'Coefficient',data:best.model.beta.slice(1),backgroundColor:'rgba(42,82,152,0.7)'}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Coefficients: '+best.name}}}});
-    var ctx3=$('residChart').getContext('2d');
-    if(charts.resid)charts.resid.destroy();
-    var scatterData=[];
-    for(var i=0;i<best.model.pred.length;i++)scatterData.push({x:best.model.pred[i],y:best.model.resid[i]});
+      data:{labels:best.model.names.slice(1),datasets:[{label:'Coefficient',data:best.model.beta.slice(1),
+            backgroundColor:best.model.beta.slice(1).map(function(v){return v>=0?'rgba(42,82,152,0.7)':'rgba(192,57,43,0.7)';})}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Coefficients: '+best.name}},
+               scales:{y:{title:{display:true,text:'Coefficient value'}}}}});
+    var ctx3=$('residChart').getContext('2d');if(charts.resid)charts.resid.destroy();
+    var sd=[];for(var i=0;i<best.model.pred.length;i++)sd.push({x:best.model.pred[i],y:best.model.resid[i]});
     charts.resid=new Chart(ctx3,{type:'scatter',
-      data:{datasets:[{label:'Residuals',data:scatterData,backgroundColor:'rgba(192,57,43,0.5)'}]},
+      data:{datasets:[{label:'Residuals',data:sd,backgroundColor:'rgba(192,57,43,0.4)'}]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{title:{display:true,text:'Residuals vs Fitted: '+best.name}},
         scales:{x:{title:{display:true,text:'Fitted'}},y:{title:{display:true,text:'Residual'}}}}});
   }
 }
 
-/* ============================================================
-   UI — RENDER HISTORY TAB
-   ============================================================ */
+/* ================================================================
+   UI — TRAINING FIT TAB
+   ================================================================ */
 function renderHistory(mr){
-  if(!mr){$('histContent').style.display='none';$('histLoading').style.display='block';return;}
   $('histLoading').style.display='none';$('histContent').style.display='block';
-  var data=mr.data, mods=mr.models;
-  var best=mods.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
-  var dates=data.map(function(d){return d.date;});
-  var actual=mr.yNet, predicted=best.model.pred;
-  var ctx=$('histChart').getContext('2d');
-  if(charts.hist)charts.hist.destroy();
+  var best=bestModel;
+  var dates=mr.trainData.map(function(d){return d.date;});
+  var ctx=$('histChart').getContext('2d');if(charts.hist)charts.hist.destroy();
   charts.hist=new Chart(ctx,{type:'line',
     data:{labels:dates,datasets:[
-      {label:'Actual Δ MM Net',data:actual,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.1)',fill:true,tension:0.1},
-      {label:'Predicted ('+best.name+')',data:predicted,borderColor:'#d4880f',borderDash:[5,5],tension:0.1}
+      {label:'Actual Δ MM Net',data:mr.yNet,borderColor:'#2a5298',backgroundColor:'rgba(42,82,152,0.08)',fill:true,tension:0.1},
+      {label:'Fitted ('+best.name+')',data:best.model.pred,borderColor:'#d4880f',borderDash:[5,4],tension:0.1}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{title:{display:true,text:'Actual vs Predicted Δ MM Net'}},
+      plugins:{title:{display:true,text:'Training fit — non-roll weeks ≤ 2025'}},
       scales:{y:{title:{display:true,text:'Δ MM Net (contracts)'}}}}});
-  var ws=Math.min(20,Math.floor(data.length/2));
+  var ws=Math.min(20,Math.floor(mr.yNet.length/3));
   var rR2=[];
-  for(var i=ws;i<data.length;i++){
-    var wy=actual.slice(i-ws,i),wp=predicted.slice(i-ws,i);
+  for(var i=ws;i<mr.yNet.length;i++){
+    var wy=mr.yNet.slice(i-ws,i),wp=best.model.pred.slice(i-ws,i);
     var ym=0;for(var j=0;j<wy.length;j++)ym+=wy[j];ym/=wy.length;
-    var st=0;for(var j=0;j<wy.length;j++)st+=Math.pow(wy[j]-ym,2);
-    var sr=0;for(var j=0;j<wy.length;j++)sr+=Math.pow(wy[j]-wp[j],2);
+    var st=0,sr=0;for(var j=0;j<wy.length;j++){st+=Math.pow(wy[j]-ym,2);sr+=Math.pow(wy[j]-wp[j],2);}
     rR2.push({x:dates[i],y:st>0?1-sr/st:0});
   }
-  var ctx2=$('accuracyChart').getContext('2d');
-  if(charts.accuracy)charts.accuracy.destroy();
+  var ctx2=$('accuracyChart').getContext('2d');if(charts.accuracy)charts.accuracy.destroy();
   charts.accuracy=new Chart(ctx2,{type:'line',
     data:{datasets:[{label:'Rolling R² ('+ws+'wk)',data:rR2,borderColor:'#1a8c4e',tension:0.2,fill:false}]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{title:{display:true,text:'Rolling R² Over Time'}},
+      plugins:{title:{display:true,text:'Rolling R² — training period'}},
       scales:{x:{type:'time',time:{unit:'month'}},y:{min:0,max:1,title:{display:true,text:'R²'}}}}});
   var tbl='';
-  mods.forEach(function(m){
+  mr.models.forEach(function(m){
     tbl+='<tr><td>'+m.name+'</td><td class="num">'+fmtPct(m.model.r2)+'</td>'+
-          '<td class="num">'+fmtNum(m.model.rmse,0)+'</td>'+
-          '<td class="num">'+fmtNum(m.model.mae,0)+'</td>'+
-          '<td class="num">'+fmtPct(m.model.dirAcc)+'</td>'+
-          '<td class="num">'+m.model.n+'</td></tr>';
+      '<td class="num">'+fmtNum(m.model.rmse,0)+'</td>'+
+      '<td class="num">'+fmtNum(m.model.mae,0)+'</td>'+
+      '<td class="num">'+fmtPct(m.model.dirAcc)+'</td>'+
+      '<td class="num">'+m.model.n+'</td></tr>';
   });
   $('accTable').innerHTML=tbl;
 }
 
-/* ============================================================
-   UI — RENDER DATA TABLE TAB
-   ============================================================ */
+/* ================================================================
+   UI — DAILY TAB
+   ================================================================ */
+function renderDailyTab(){
+  $('dailyLoading').style.display='none';$('dailyContent').style.display='block';
+  var latest=mergedData[mergedData.length-1];
+  var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function buildGrid(details){
+    if(!details||!details.length)return'<p style="color:#999;font-size:0.8rem;">No daily data.</p>';
+    var h='<div class="day-row">';
+    for(var i=0;i<details.length;i++){
+      var dd=details[i];
+      h+='<div class="day-cell'+(dd.isTransfer?' transfer':'')+'">'+
+        '<div style="font-weight:700;font-size:0.72rem;color:'+(dd.isTransfer?'var(--vol)':'#555')+'">'+
+        dd.dayName+' '+(dd.date?fmtDate(dd.date).slice(5):'')+(dd.isTransfer?' 🔀':'')+'</div>'+
+        '<div>ΔF: '+(dd.dFront!=null?(dd.dFront>0?'+':'')+fmtK(dd.dFront):'—')+'</div>'+
+        '<div>ΔB: '+(dd.dBack!=null?(dd.dBack>0?'+':'')+fmtK(dd.dBack):'—')+'</div>'+
+        (hasVolume?'<div style="color:var(--vol)">TVol: '+(dd.tVol!=null?fmtK(dd.tVol):'—')+'</div>':'')+
+        (hasVolume?'<div style="color:var(--vol)">V/OI: '+(dd.dayVolOI!=null?dd.dayVolOI.toFixed(1):'—')+'</div>':'')+
+        '<div style="color:#555;">ΔP: '+(dd.dPrice!=null?(dd.dPrice>0?'+':'')+dd.dPrice.toFixed(2)+'¢':'—')+'</div>'+
+        '</div>';
+    }
+    return h+'</div>';
+  }
+  $('dailyCurrent').innerHTML=latest?buildGrid(latest.daily_details):'';
+  var prev=mergedData.length>1?mergedData[mergedData.length-2]:null;
+  $('dailyPrior').innerHTML=prev&&prev.daily_details?buildGrid(prev.daily_details):'<p style="color:#999;font-size:0.8rem;">No prior week.</p>';
+  if(latest&&latest.daily_details&&latest.daily_details.length){
+    var dd=latest.daily_details;
+    var labels=dd.map(function(d){return d.dayName+' '+(d.date?fmtDate(d.date).slice(5):'');});
+    var ds=[
+      {label:'Δ Front OI',data:dd.map(function(d){return d.dFront||0;}),backgroundColor:'rgba(42,82,152,0.6)',type:'bar',yAxisID:'y'},
+      {label:'Δ Back OI', data:dd.map(function(d){return d.dBack||0;}), backgroundColor:'rgba(26,140,78,0.5)',type:'bar',yAxisID:'y'},
+      {label:'Δ Price ¢', data:dd.map(function(d){return d.dPrice||0;}),borderColor:'#d4880f',type:'line',yAxisID:'y2',tension:0.2}
+    ];
+    if(hasVolume)ds.push({label:'T.Vol/OI',data:dd.map(function(d){return d.dayVolOI||0;}),
+      borderColor:'#7b2fbe',backgroundColor:'rgba(123,47,190,0.12)',type:'bar',yAxisID:'y3'});
+    var sc={y:{position:'left',title:{display:true,text:'Δ OI'}},
+            y2:{position:'right',title:{display:true,text:'Δ Price ¢'},grid:{drawOnChartArea:false}}};
+    if(hasVolume)sc.y3={position:'right',title:{display:true,text:'Vol/OI'},grid:{drawOnChartArea:false}};
+    var ctx=$('dailyChart').getContext('2d');if(charts.daily)charts.daily.destroy();
+    charts.daily=new Chart(ctx,{data:{labels:labels,datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{title:{display:true,text:'Daily breakdown — current COT week'}},scales:sc}});
+  }
+}
+
+/* ================================================================
+   UI — DATA TABLE TAB
+   ================================================================ */
 function renderDataTable(){
-  if(!mergedData.length){$('dataContent').style.display='none';$('dataLoading').style.display='block';return;}
   $('dataLoading').style.display='none';$('dataContent').style.display='block';
-  var hdrs=['Date','MM Net','Δ Net','Δ Long','Δ Short','Δ Front OI','Δ Back OI','Δ Total OI','Δ Price','OI Mom','Active'];
-  if(hasVolume)hdrs.splice(9,0,'Total Vol','Vol/OI','Trans Days','Trans Score');
+  var hdrs=['Date','Split','Roll?','MM Net','Δ Net','Δ Long','Δ Short',
+            'Δ Front OI','Δ Back OI','Δ Price','OI Mom','Active'];
+  if(hasVolume)hdrs.splice(11,0,'Vol/OI','T.Days','T.Score');
   $('dataHead').innerHTML='<tr>'+hdrs.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr>';
   var tb='';
   for(var i=mergedData.length-1;i>=0;i--){
     var d=mergedData[i];
-    tb+='<tr>'+
-        '<td>'+fmtDate(d.date)+'</td>'+
-        '<td class="num">'+fmtNum(d.mm_net,0)+'</td>'+
-        '<td class="num '+(d.mm_net_delta>=0?'pos':'neg')+'">'+(d.mm_net_delta>0?'+':'')+fmtNum(d.mm_net_delta,0)+'</td>'+
-        '<td class="num '+(d.mm_long_delta>=0?'pos':'neg')+'">'+(d.mm_long_delta>0?'+':'')+fmtNum(d.mm_long_delta,0)+'</td>'+
-        '<td class="num '+(d.mm_short_delta>=0?'pos':'neg')+'">'+(d.mm_short_delta>0?'+':'')+fmtNum(d.mm_short_delta,0)+'</td>'+
-        '<td class="num '+(d.front_oi_delta>=0?'pos':'neg')+'">'+(d.front_oi_delta>0?'+':'')+fmtNum(d.front_oi_delta,0)+'</td>'+
-        '<td class="num '+(d.back_oi_delta>=0?'pos':'neg')+'">'+(d.back_oi_delta>0?'+':'')+fmtNum(d.back_oi_delta,0)+'</td>'+
-        '<td class="num '+(d.total_oi_delta>=0?'pos':'neg')+'">'+(d.total_oi_delta>0?'+':'')+fmtNum(d.total_oi_delta,0)+'</td>'+
-        '<td class="num '+(d.price_delta>=0?'pos':'neg')+'">'+(d.price_delta>0?'+':'')+fmtNum(d.price_delta,2)+'</td>'+
-        (hasVolume?'<td class="num">'+fmtK(d.total_vol)+'</td><td class="num">'+fmtNum(d.vol_oi_ratio,2)+'</td><td class="num">'+fmtNum(d.transfer_days,0)+'</td><td class="num '+(d.transfer_score>=0?'pos':'neg')+'">'+(d.transfer_score>0?'+':'')+fmtNum(d.transfer_score,0)+'</td>':'')+
-        '<td class="num">'+fmtNum(d.oi_momentum,2)+'</td>'+
-        '<td>'+(d.active_contract||'')+'</td>'+
-        '</tr>';
+    var split=d.year>=2026?'<span class="badge badge-test">TEST</span>':'<span class="badge badge-train">TRAIN</span>';
+    var rollBadge=d.isRoll?'<span class="badge badge-roll">ROLL</span>':'';
+    tb+='<tr class="'+(d.year>=2026?'holdout-row-actual':'')+(d.isRoll?' holdout-row-roll':'')+'">'+
+      '<td>'+fmtDate(d.date)+'</td>'+
+      '<td>'+split+'</td>'+
+      '<td style="text-align:center;">'+rollBadge+'</td>'+
+      '<td class="num">'+fmtNum(d.mm_net,0)+'</td>'+
+      '<td class="num '+(d.mm_net_delta>=0?'pos':'neg')+'">'+(d.mm_net_delta>0?'+':'')+fmtNum(d.mm_net_delta,0)+'</td>'+
+      '<td class="num '+(d.mm_long_delta>=0?'pos':'neg')+'">'+(d.mm_long_delta>0?'+':'')+fmtNum(d.mm_long_delta,0)+'</td>'+
+      '<td class="num '+(d.mm_short_delta>=0?'pos':'neg')+'">'+(d.mm_short_delta>0?'+':'')+fmtNum(d.mm_short_delta,0)+'</td>'+
+      '<td class="num '+(d.front_oi_delta>=0?'pos':'neg')+'">'+(d.front_oi_delta>0?'+':'')+fmtNum(d.front_oi_delta,0)+'</td>'+
+      '<td class="num '+(d.back_oi_delta>=0?'pos':'neg')+'">'+(d.back_oi_delta>0?'+':'')+fmtNum(d.back_oi_delta,0)+'</td>'+
+      '<td class="num '+(d.price_delta>=0?'pos':'neg')+'">'+(d.price_delta>0?'+':'')+fmtNum(d.price_delta,2)+'</td>'+
+      (hasVolume?
+        '<td class="num">'+fmtNum(d.vol_oi_ratio,2)+'</td>'+
+        '<td class="num">'+fmtNum(d.transfer_days,0)+'</td>'+
+        '<td class="num '+(d.transfer_score>=0?'pos':'neg')+'">'+(d.transfer_score>0?'+':'')+fmtNum(d.transfer_score,0)+'</td>':'')+
+      '<td class="num">'+fmtNum(d.oi_momentum,2)+'</td>'+
+      '<td>'+(d.active_contract||'')+'</td>'+
+      '</tr>';
   }
   $('dataBody').innerHTML=tb;
 }
 
-/* ============================================================
-   UI — RENDER DEBUG TAB
-   ============================================================ */
-function renderDebug(){
-  if(!mergedData.length){$('debugContent').style.display='none';$('debugLoading').style.display='block';return;}
+/* ================================================================
+   UI — DEBUG TAB
+   ================================================================ */
+function renderDebug(mr){
   $('debugLoading').style.display='none';$('debugContent').style.display='block';
-  var s='<p><strong>OI Date Column:</strong> "'+OI_DATE_COL+'"</p>'+
-        '<p><strong>Volume Detected:</strong> '+(hasVolume?'YES — '+volColsFound.join(', '):'NO (add VOLUME columns to CSV to enable volume features)')+'</p>'+
-        '<p><strong>OI Records:</strong> '+oiData.length+'</p>'+
-        '<p><strong>COT Records:</strong> '+cotData.length+'</p>'+
-        '<p><strong>Merged Weekly:</strong> '+mergedData.length+'</p>';
-  $('debugSummary').innerHTML=s;
+  var rollCount=mergedData.filter(function(d){return d.isRoll;}).length;
+  $('debugSummary').innerHTML=
+    '<p><strong>OI Date Column:</strong> "'+OI_DATE_COL+'"</p>'+
+    '<p><strong>Volume:</strong> '+(hasVolume?'YES — '+volCols.slice(0,4).join(', '):'NO')+'</p>'+
+    '<p><strong>All weekly rows:</strong> '+mergedData.length+'</p>'+
+    '<p><strong>Roll weeks (excluded from training):</strong> '+rollCount+'</p>'+
+    '<p><strong>Training rows (≤2025, non-roll):</strong> '+trainData.length+'</p>'+
+    '<p><strong>Test rows (2026, non-roll):</strong> '+testData.length+'</p>'+
+    '<p><strong>Best model:</strong> '+bestModel.name+' R²='+fmtPct(bestModel.model.r2)+'</p>';
   if(oiData.length)$('debugOiSample').textContent=JSON.stringify(oiData[0],null,2);
   if(cotData.length)$('debugCotFields').textContent=JSON.stringify(cotData[0],null,2);
   var ws=mergedData.slice(-3).map(function(d){
-    return{date:d.date,front_oi_delta:d.front_oi_delta,back_oi_delta:d.back_oi_delta,
-           total_oi_delta:d.total_oi_delta,price_delta:d.price_delta,
-           total_vol:d.total_vol,vol_oi_ratio:d.vol_oi_ratio,
-           transfer_days:d.transfer_days,transfer_score:d.transfer_score,
-           oi_momentum:d.oi_momentum,
-           mm_net_delta:d.mm_net_delta,mm_long_delta:d.mm_long_delta,mm_short_delta:d.mm_short_delta};
+    return{date:d.date,year:d.year,isRoll:d.isRoll,
+           front_oi_delta:d.front_oi_delta,back_oi_delta:d.back_oi_delta,
+           front_oi_delta_z:d.front_oi_delta_z,back_oi_delta_z:d.back_oi_delta_z,
+           price_delta:d.price_delta,price_delta_z:d.price_delta_z,
+           oi_momentum:d.oi_momentum,price_oi_interaction:d.price_oi_interaction,
+           vol_oi_ratio:d.vol_oi_ratio,transfer_days:d.transfer_days,
+           mm_net_delta:d.mm_net_delta};
   });
   $('debugWeekly').textContent=JSON.stringify(ws,null,2);
   if(bestModel&&bestModel.model.names){
-    var dbg='Best Model: '+bestModel.name+'\nR²: '+fmtPct(bestModel.model.r2)+'\nCoefficients:\n';
-    for(var i=0;i<bestModel.model.names.length;i++){
+    var dbg='Best Model: '+bestModel.name+'\nR² (train): '+fmtPct(bestModel.model.r2)+'\n';
+    dbg+='RMSE: '+fmtNum(bestModel.model.rmse,0)+' | MAE: '+fmtNum(bestModel.model.mae,0)+'\n';
+    dbg+='Coefficients:\n';
+    for(var i=0;i<bestModel.model.names.length;i++)
       dbg+='  '+bestModel.model.names[i]+': '+fmtNum(bestModel.model.beta[i],5)+'\n';
-    }
     $('debugReg').textContent=dbg;
   }
 }
 
-/* ============================================================
+/* ================================================================
    MAIN WORKFLOW
-   ============================================================ */
+   ================================================================ */
 function switchTab(id,el){
   var tabs=document.querySelectorAll('.tab');
   for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
   var bodies=document.querySelectorAll('.tab-body');
   for(var i=0;i<bodies.length;i++)bodies[i].classList.remove('active');
-  el.classList.add('active');
-  $(id).classList.add('active');
+  el.classList.add('active');$(id).classList.add('active');
 }
 
 function loadAllData(){
   showStatus('loadStatus','Loading OI data...','warn');
   $('dlBtn').style.display='none';
-  OI_DATE_COL='Dates'; hasVolume=false; volColsFound=[];
+  OI_DATE_COL='Dates';hasVolume=false;volCols=[];
   var oiUrl=$('oiUrl').value||'data/cotton_raw.csv';
   var cotSrc=$('cotSource').value;
 
@@ -1302,35 +1377,39 @@ function loadAllData(){
   .then(function(text){
     oiData=parseCSV(text);
     showStatus('loadStatus',
-      'OI loaded: '+oiData.length+' rows | date col: "'+OI_DATE_COL+'" | volume: '+
-      (hasVolume?'YES ('+volColsFound.length+' cols)':'NO — add VOLUME columns for transfer signals')+
-      '. Loading COT...','ok');
+      'OI: '+oiData.length+' rows | date col: "'+OI_DATE_COL+'" | '+
+      (hasVolume?'volume: '+volCols.length+' cols found':'no volume cols — OI+price only')+
+      '. Fetching COT...','ok');
     if(cotSrc==='api')return fetchCOTFromAPI();
     return loadCOTFromCSV($('cotCsvUrl').value||'data/cot_cotton.csv');
   })
   .then(function(cot){
     cotData=cot;
-    showStatus('loadStatus','COT: '+cotData.length+' records. Aligning Wed-Tue weeks...','ok');
+    showStatus('loadStatus','COT: '+cotData.length+' records. Aligning Wed→Tue weeks...','ok');
     mergedData=alignWeekly();
     if(!mergedData.length){
-      showStatus('loadStatus','ERROR: No aligned data. Check date overlap. Date col: "'+OI_DATE_COL+'"','err');
+      showStatus('loadStatus','ERROR: No aligned data. Date col detected: "'+OI_DATE_COL+'"','err');
       return;
     }
-    showStatus('loadStatus','Aligned: '+mergedData.length+' weekly records. Training models...','ok');
+    showStatus('loadStatus','Aligned: '+mergedData.length+' weeks. Building models (train≤2025, test 2026)...','ok');
     var mr=buildModels();
-    if(!mr){showStatus('loadStatus','ERROR: Need >=10 weeks with long+short+net data.','err');return;}
-    bestModel=mr.models.reduce(function(a,b){return a.model.r2>b.model.r2?a:b;});
-    var pr=predictLatest(mr);
-    renderPrediction(pr);
-    renderDailyTab(pr);
+    if(!mr){
+      showStatus('loadStatus','ERROR: Not enough training data (need ≥10 non-roll weeks with long+short+net). Check debug tab.','err');
+      return;
+    }
+    var holdout=evalHoldout(mr);
+    renderPrediction(mr);
+    renderHoldout(holdout);
     renderModels(mr);
     renderHistory(mr);
+    renderDailyTab();
     renderDataTable();
-    renderDebug();
+    renderDebug(mr);
     $('dlBtn').style.display='inline-block';
     showStatus('loadStatus',
-      'Done! Best model: '+bestModel.name+' R²='+fmtPct(bestModel.model.r2)+
-      ' | Vol: '+(hasVolume?'included':'not found in CSV'),'ok');
+      '✅ Done | Best: '+bestModel.name+' R²='+fmtPct(bestModel.model.r2)+
+      ' (train '+trainData.length+' wks) | 2026 holdout: '+testData.length+' wks | '+
+      (hasVolume?'Volume included':'OI+price only'),'ok');
   })
   .catch(function(e){
     console.error(e);
@@ -1340,20 +1419,25 @@ function loadAllData(){
 
 function downloadMergedCsv(){
   if(!mergedData.length)return;
-  var hdrs=['Date','MM_Net','MM_Long','MM_Short','MM_Net_Delta','MM_Long_Delta','MM_Short_Delta',
+  var hdrs=['Date','Year','IsRoll','Split',
+            'MM_Net','MM_Long','MM_Short','MM_Net_Delta','MM_Long_Delta','MM_Short_Delta',
             'Front_OI_Delta','Back_OI_Delta','Total_OI_Delta','Price_Delta',
             'Front_OI_Level','Total_OI_Level','Total_Vol','Vol_OI_Ratio',
-            'Transfer_Days','Transfer_Score','OI_Momentum','Active_Contract'];
+            'Transfer_Days','Transfer_Score','OI_Momentum','Price_OI_Interaction',
+            'Front_OI_Z','Back_OI_Z','Price_Z','Active_Contract'];
   var csv=hdrs.join(',')+'\n';
   mergedData.forEach(function(d){
-    csv+=[d.date,d.mm_net,d.mm_long,d.mm_short,d.mm_net_delta,d.mm_long_delta,d.mm_short_delta,
+    csv+=[d.date,d.year,d.isRoll?1:0,d.year>=2026?'TEST':'TRAIN',
+          d.mm_net,d.mm_long,d.mm_short,d.mm_net_delta,d.mm_long_delta,d.mm_short_delta,
           d.front_oi_delta,d.back_oi_delta,d.total_oi_delta,d.price_delta,
           d.front_oi_level,d.total_oi_level,d.total_vol,d.vol_oi_ratio,
-          d.transfer_days,d.transfer_score,d.oi_momentum,d.active_contract].join(',')+'\n';
+          d.transfer_days,d.transfer_score,d.oi_momentum,d.price_oi_interaction,
+          d.front_oi_delta_z,d.back_oi_delta_z,d.price_delta_z,
+          d.active_contract].join(',')+'\n';
   });
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download='cotton_mm_v3_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.download='cotton_mm_v4_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
 }
 
